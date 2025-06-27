@@ -283,4 +283,251 @@ This is a markdown block
         const updatedNote = NoteFormat.load(updatedBufferData)
         expect(updatedNote.foldedRanges.length).toBe(0)
     });
+
+    test("folded block does not unfold when new block created after it and backspace pressed immediately", async ({ page }) => {
+        // Start with a multi-line block followed by an empty block
+        await heynotePage.setContent(`
+∞∞∞text
+Block A line 1
+Block A line 2
+Block A line 3
+`)
+        
+        // Fold the first block
+        await heynotePage.setCursorPosition(20) // Middle of Block A
+        const foldKey = heynotePage.isMac ? "Alt+Meta+[" : "Alt+Control+["
+        await page.locator("body").press(foldKey)
+        
+        // Verify block is folded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Position cursor in the second block and create a new block after it
+        const blocks = await heynotePage.getBlocks()
+        await heynotePage.setCursorPosition(blocks[0].content.from) // Beginning of block
+        
+        // Create a new block using Ctrl/Cmd+Enter
+        await page.locator("body").press(heynotePage.agnosticKey("Mod+Enter"))
+        await expect(await heynotePage.getBlocks()).toHaveLength(2) // Should now have 2 blocks
+        
+        // Immediately press backspace at the beginning of the new block
+        await page.locator("body").press("Backspace")
+        
+        // The folded block should NOT unfold (should still have 1 fold placeholder)
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        await expect(await heynotePage.getBlocks()).toHaveLength(1) // Should now have 1 block
+    });
+
+    test("folded block unfolds when new block created after it, content added, then backspace at beginning", async ({ page }) => {
+        // Start with a multi-line block followed by an empty block
+        await heynotePage.setContent(`
+∞∞∞text
+Block A line 1
+Block A line 2
+Block A line 3
+`)
+        
+        // Fold the first block
+        await heynotePage.setCursorPosition(20) // Middle of Block A
+        const foldKey = heynotePage.isMac ? "Alt+Meta+[" : "Alt+Control+["
+        await page.locator("body").press(foldKey)
+        
+        // Verify block is folded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Position cursor in the second block and create a new block after it
+        const blocks = await heynotePage.getBlocks()
+        await heynotePage.setCursorPosition(blocks[0].content.from) // Beginning of second block
+        
+        // Create a new block using Ctrl/Cmd+Enter and add content
+        await page.locator("body").press(heynotePage.agnosticKey("Mod+Enter"))
+        await expect(await heynotePage.getBlocks()).toHaveLength(2) // Should now have 2 blocks
+        await page.locator("body").pressSequentially("new content")
+        
+        // Move cursor to the beginning of the new block content
+        await page.locator("body").press("Home") // Go to beginning of line
+        
+        // Press backspace - this should unfold the folded block since we have content
+        await page.locator("body").press("Backspace")
+        
+        // The folded block SHOULD unfold (should have 0 fold placeholders)
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(0)
+        await expect(await heynotePage.getBlocks()).toHaveLength(1) // Should now have 1 block
+    });
+
+    test("folded block does not unfold when new block created before it and delete pressed immediately", async ({ page }) => {
+        // Start with an empty block followed by a multi-line block
+        await heynotePage.setContent(`
+∞∞∞text
+Block B line 1
+Block B line 2
+Block B line 3
+`)
+        
+        // Fold the second block
+        const blocks = await heynotePage.getBlocks()
+        await heynotePage.setCursorPosition(blocks[0].content.from + 10) // Middle of Block B
+        const foldKey = heynotePage.isMac ? "Alt+Meta+[" : "Alt+Control+["
+        await page.locator("body").press(foldKey)
+        
+        // Verify block is folded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Position cursor in the first block and create a new block before the folded block
+        await heynotePage.setCursorPosition(blocks[0].content.from) // Beginning of first block
+        
+        // Create a new block using Alt+Enter (creates block before current)
+        await page.locator("body").press("Alt+Enter")
+        await expect(await heynotePage.getBlocks()).toHaveLength(2) // Should now have 2 blocks
+        
+        // Immediately press delete at the end of the new empty block
+        await page.locator("body").press("Delete")
+        
+        // The folded block should NOT unfold (should still have 1 fold placeholder)
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        await expect(await heynotePage.getBlocks()).toHaveLength(1) // Should now have 1 block
+    });
+
+    test("folded block unfolds when new block created before it, content added, then delete at end", async ({ page }) => {
+        // Start with an empty block followed by a multi-line block
+        await heynotePage.setContent(`
+∞∞∞text
+Block B line 1
+Block B line 2
+Block B line 3
+`)
+        
+        // Fold the second block
+        const blocks = await heynotePage.getBlocks()
+        await heynotePage.setCursorPosition(blocks[0].content.from + 10) // Middle of Block B
+        const foldKey = heynotePage.isMac ? "Alt+Meta+[" : "Alt+Control+["
+        await page.locator("body").press(foldKey)
+        
+        // Verify block is folded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Position cursor in the first block and create a new block before the folded block
+        await heynotePage.setCursorPosition(blocks[0].content.from) // Beginning of first block
+        
+        // Create a new block using Alt+Enter and add content
+        await page.locator("body").press("Alt+Enter")
+        await page.locator("body").pressSequentially("new content")
+        await expect(await heynotePage.getBlocks()).toHaveLength(2) // Should now have 2 blocks
+        
+        // Move cursor to the end of the new block content
+        await page.locator("body").press("End") // Go to end of current line
+        
+        // Press delete - this should unfold the folded block since we have content
+        await page.locator("body").press("Delete")
+        
+        // The folded block SHOULD unfold (should have 0 fold placeholders)
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(0)
+        await expect(await heynotePage.getBlocks()).toHaveLength(1) // Should now have 1 block
+    });
+
+    test("typing at the beginning of a folded block unfolds it", async ({ page }) => {
+        // Set up test content with a multi-line block
+        await heynotePage.setContent(`
+∞∞∞text
+Block A line 1
+Block A line 2
+Block A line 3`)
+        
+        // Fold the block
+        await heynotePage.setCursorPosition(20) // Middle of Block A
+        const foldKey = heynotePage.isMac ? "Alt+Meta+[" : "Alt+Control+["
+        await page.locator("body").press(foldKey)
+        
+        // Verify block is folded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Position cursor at the very beginning of the folded block (right after the delimiter)
+        const blocks = await heynotePage.getBlocks()
+        await heynotePage.setCursorPosition(blocks[0].content.from)
+        
+        // Type a character - this should unfold the block
+        await page.locator("body").pressSequentially("X")
+        
+        // Verify the block is now unfolded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(0)
+        
+        // Verify the character was inserted at the beginning
+        const content = await heynotePage.getContent()
+        expect(content).toContain("XBlock A line 1")
+    });
+
+    test("typing at the end of a folded block unfolds it", async ({ page }) => {
+        // Set up test content with a multi-line block
+        await heynotePage.setContent(`
+∞∞∞text
+Block A line 1
+Block A line 2
+Block A line 3`)
+        
+        // Fold the block
+        await heynotePage.setCursorPosition(20) // Middle of Block A
+        const foldKey = heynotePage.isMac ? "Alt+Meta+[" : "Alt+Control+["
+        await page.locator("body").press(foldKey)
+        
+        // Verify block is folded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Position cursor at the very end of the folded block (end of last line, not including newline)
+        const blocks = await heynotePage.getBlocks()
+        await heynotePage.setCursorPosition(blocks[0].content.to)
+        
+        // Type a character - this should unfold the block
+        await page.locator("body").pressSequentially("Y")
+        
+        // Verify the block is now unfolded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(0)
+        
+        // Verify the character was inserted at the end
+        const content = await heynotePage.getContent()
+        expect(content).toContain("Block A line 3Y")
+    });
+
+    test("folded block does not unfold when language changes", async ({ page }) => {
+        // Set up test content with a multi-line block
+        await heynotePage.setContent(`
+∞∞∞text
+Block A line 1
+Block A line 2
+Block A line 3`)
+        
+        // Fold the block
+        await heynotePage.setCursorPosition(20) // Middle of Block A
+        const foldKey = heynotePage.isMac ? "Alt+Meta+[" : "Alt+Control+["
+        await page.locator("body").press(foldKey)
+        
+        // Verify block is folded
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Get the initial block to verify language change
+        const initialBlocks = await heynotePage.getBlocks()
+        expect(initialBlocks[0].language.name).toBe("text")
+        
+        // Position cursor at the beginning of the folded block and open language selector
+        await heynotePage.setCursorPosition(initialBlocks[0].content.from)
+        await page.locator("body").press(heynotePage.agnosticKey("Mod+L"))
+        
+        // Select JavaScript language
+        await page.locator("body").pressSequentially("javascript")
+        await page.locator("body").press("Enter")
+        
+        // Wait for language change to apply
+        await page.waitForTimeout(100)
+        
+        // Verify the block is still folded (should not unfold due to language change)
+        await expect(page.locator(".cm-foldPlaceholder")).toHaveCount(1)
+        
+        // Verify the language actually changed
+        const updatedBlocks = await heynotePage.getBlocks()
+        expect(updatedBlocks[0].language.name).toBe("javascript")
+        
+        // Verify the content is unchanged
+        const content = await heynotePage.getContent()
+        expect(content).toContain("Block A line 1")
+        expect(content).toContain("Block A line 2")
+        expect(content).toContain("Block A line 3")
+    });
 });

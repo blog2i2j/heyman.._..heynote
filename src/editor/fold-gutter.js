@@ -1,10 +1,9 @@
-import { codeFolding, foldGutter, foldState, unfoldEffect, foldEffect } from "@codemirror/language"
+import { codeFolding, foldGutter, unfoldEffect, foldEffect, foldedRanges } from "@codemirror/language"
 import { EditorView } from "@codemirror/view"
-import { RangeSet } from "@codemirror/state"
 
 import { FOLD_LABEL_LENGTH } from "@/src/common/constants.js"
-import { getNoteBlockFromPos, getNoteBlocksFromRangeSet } from "./block/block.js"
-import { transactionsHasAnnotation, ADD_NEW_BLOCK, transactionsHasHistoryEvent } from "./annotation.js"
+import { getNoteBlockFromPos, getNoteBlocksFromRangeSet, delimiterRegexWithoutNewline } from "./block/block.js"
+import { transactionsHasAnnotationsAny, ADD_NEW_BLOCK, LANGUAGE_CHANGE, transactionsHasHistoryEvent } from "./annotation.js"
 
 
 // This extension fixes so that a folded region is automatically unfolded if any changes happen 
@@ -20,14 +19,14 @@ const autoUnfoldOnEdit = () => {
         }
 
         const { state, view } = update;
-        const foldRanges = state.field(foldState, false);
+        const foldRanges = foldedRanges(state, false)
 
         if (!foldRanges || foldRanges.size === 0) {
             return
         }
         
-        // we don't want to unfold a block/range if the user adds a new block
-        if (transactionsHasAnnotation(update.transactions, ADD_NEW_BLOCK)) {
+        // we don't want to unfold a block/range if the user adds a new block, or changes language of the block
+        if (transactionsHasAnnotationsAny(update.transactions, [ADD_NEW_BLOCK, LANGUAGE_CHANGE])) {
             return
         }
         // an undo/redo action should never be able to get characters into a folded line but if we don't have 
@@ -51,6 +50,24 @@ const autoUnfoldOnEdit = () => {
                 const lineTo = state.doc.lineAt(to).to;
 
                 //console.log("lineFrom:", lineFrom, "lineTo:", lineTo, "fromA:", fromA, "toA:", toA, "fromB:", fromB, "toB:", toB);
+
+                if (
+                    fromB === toB && fromB === lineFrom &&
+                    (state.doc.length === 0 || state.doc.lineAt(lineFrom - 1).text.match(delimiterRegexWithoutNewline))
+                ) {
+                    // if the change is the beginning of the folded line, we'll check if a block separator is
+                    // immediately before the folded range (or beginning of document), and we if so, we don't unfold it
+                    return
+                }
+
+                if (
+                    fromB === toB && fromB === lineTo &&
+                    (state.doc.length === toB || state.doc.lineAt(toB + 1).text.match(delimiterRegexWithoutNewline))
+                ) {
+                    // If the change is at the end of the folded line, we'll check what comes after the folded range,
+                    // and if it's a new block, or the end of the document, we don't unfold it
+                    return
+                }
 
                 if ((fromB >= lineFrom && fromB <= lineTo) || (toB >= lineFrom && toB <= lineTo)) {
                     unfoldRanges.push({ from, to });
@@ -118,7 +135,7 @@ export function foldGutterExtension() {
 
 export const toggleBlockFold = (editor) => (view) => {
     const state = view.state
-    const folds = state.field(foldState, false) || RangeSet.empty
+    const folds = foldedRanges(state)
 
     const foldEffects = []
     const unfoldEffects = []
@@ -179,7 +196,7 @@ export const foldBlock = (editor) => (view) => {
 
 export const unfoldBlock = (editor) => (view) => {
     const state = view.state
-    const folds = state.field(foldState, false) || RangeSet.empty
+    const folds = foldedRanges(state)
     const blockFolds = []
 
     for (const block of getNoteBlocksFromRangeSet(state, state.selection.ranges)) {
