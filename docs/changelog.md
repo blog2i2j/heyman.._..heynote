@@ -2,6 +2,15 @@
 
 Here are the most notable changes in each release. For a more detailed list of changes, see the [Github Releases page](https://github.com/heyman/heynote/releases).
 
+## 2.3.3
+
+- Prevent blocks from unfolding when changing the block language
+- Fix issue toggling the fold gutter setting
+
+## 2.3.2
+
+- Improve folding to be less aggressive with the unfolding (e.g. when creating a new block after a folded block, and then immediately pressing backspace to remove the new block)
+
 ## 2.3.1
 
 - Fix issue with the cursor being a few pixels too short
