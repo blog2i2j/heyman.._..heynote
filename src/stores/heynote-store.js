@@ -40,6 +40,7 @@ export const useHeynoteStore = defineStore("heynote", {
         drawImageUrl: null,
         drawImageId: null,
 
+        showLeftPanel: true,
         isFullscreen: false,
         isFocused: true,
         systemLocale: navigator.language,

@@ -20,6 +20,7 @@
     import NewBuffer from './NewBuffer.vue'
     import EditBuffer from './EditBuffer.vue'
     import TabBar from './tabs/TabBar.vue'
+    import MainMenuButton from './tabs/MainMenuButton.vue'
     import DrawImageModal from './draw/DrawImageModal.vue'
 
     export default {
@@ -33,6 +34,7 @@
             NewBuffer,
             EditBuffer,
             TabBar,
+            MainMenuButton,
             DrawImageModal,
         },
 
@@ -120,6 +122,7 @@
                 "showDrawImageModal",
                 "drawImageUrl",
                 "drawImageId",
+                "showLeftPanel",
                 "isFullscreen",
             ]),
             ...mapState(useSettingsStore, [
@@ -235,20 +238,30 @@
 </script>
 
 <template>
-    <TabBar v-if="showTabBar" />
     <div 
         class="container" 
         :class="{'tab-bar-visible':showTabBar}"
-    >
-        <Editor 
-            v-if="currentBufferPath"
-            :theme="settingsStore.theme"
-            :development="development"
-            :debugSyntaxTree="false"
-            :inert="editorInert"
-            class="editor"
-            ref="editor"
-        />
+    >   
+        <div class="main-container">
+            <div class="left-panel" v-if="showLeftPanel">
+                <div class="top-bar">
+                    <MainMenuButton />
+                </div>
+                <div class="left-panel-content"></div>
+            </div>
+            <div class="editor-container">
+                <TabBar v-if="showTabBar" />
+                <Editor 
+                    v-if="currentBufferPath"
+                    :theme="settingsStore.theme"
+                    :development="development"
+                    :debugSyntaxTree="false"
+                    :inert="editorInert"
+                    class="editor"
+                    ref="editor"
+                />
+            </div>
+        </div>
         <StatusBar 
             :autoUpdate="settings.autoUpdate"
             :allowBetaVersions="settings.allowBetaVersions"
@@ -314,10 +327,31 @@
         width: 100%
         height: 100%
         position: relative
-        &.tab-bar-visible
-            height: calc(100% - var(--tab-bar-height))
-        .editor
-            height: calc(100% - 21px)
+        .main-container
+            height: calc(100% - var(--status-bar-height))
+            display: flex
+            flex-direction: row
+            .left-panel
+                //app-region: drag
+                width: 260px
+                flex-shrink: 0
+                height: 100%
+                //background: #1f1f1f
+                background: rgb(27, 28, 29)
+                display: flex
+                flex-direction: column
+                .top-bar
+                    height: var(--tab-bar-height)
+                    flex-shrink: 0
+                    app-region: drag
+                .left-panel-content
+                    flex-grow: 1
+                    border-right: 1px solid var(--tab-bar-border-bottom-color)
+            .editor-container
+                height: 100%
+                flex-grow: 1
+                .editor
+                    height: calc(100% - var(--tab-bar-height))
         .status
             position: absolute
             bottom: 0
