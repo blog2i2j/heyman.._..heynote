@@ -41,6 +41,7 @@ export const useHeynoteStore = defineStore("heynote", {
         drawImageId: null,
 
         showLeftPanel: true,
+        leftPanelWidth: 260,
         isFullscreen: false,
         isFocused: true,
         systemLocale: navigator.language,
@@ -398,6 +399,11 @@ export async function initHeynoteStore() {
 
     watch(() => heynoteStore.currentBufferPath, () => heynoteStore.saveTabsState())
     watch(() => heynoteStore.openTabs, () => heynoteStore.saveTabsState())
+
+    watch(() => heynoteStore.leftPanelWidth, () => {
+        //console.log("updating --left-panel-width")
+        document.documentElement.style.setProperty("--left-panel-width", heynoteStore.leftPanelWidth + "px");
+    }, {immediate:true})
 
     heynoteStore.systemLocale = toSafeBrowserLocale(await window.heynote.getSystemLocale())
 }

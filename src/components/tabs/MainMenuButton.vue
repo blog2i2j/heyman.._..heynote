@@ -1,5 +1,13 @@
 <script>
+    import { mapState } from 'pinia'
+    import { useHeynoteStore } from "@/src/stores/heynote-store"
+
     export default {
+        computed: {
+            ...mapState(useHeynoteStore, [
+                "showLeftPanel",
+            ]),
+        },
         methods: {
             onMainMenuClick(event) {
                 const x = event.target.offsetLeft

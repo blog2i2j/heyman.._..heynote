@@ -333,7 +333,7 @@
             flex-direction: row
             .editor-container
                 height: 100%
-                width: calc(100% - 260px)
+                width: calc(100% - var(--left-panel-width))
                 flex-grow: 1
                 .editor
                     height: calc(100% - var(--tab-bar-height))
