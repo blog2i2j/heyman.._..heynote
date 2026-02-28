@@ -39,7 +39,7 @@
             ...mapState(useSettingsStore, [
                 "theme",
             ]),
-            ...mapStores(useHeynoteStore),
+            ...mapStores(useHeynoteStore, useSettingsStore),
 
             backgroundColor() {
                 if (this.theme === "dark") {
@@ -95,6 +95,12 @@
                 this.isResizing = false
                 window.removeEventListener("mousemove", this.onWindowMouseMove)
                 window.removeEventListener("mouseup", this.onWindowMouseUp)
+                const width = Math.round(this.heynoteStore.leftPanelWidth)
+                if (this.settingsStore.settings.leftPanelWidth !== width) {
+                    this.settingsStore.updateSettings({
+                        leftPanelWidth: width,
+                    })
+                }
             },
         },
     }
