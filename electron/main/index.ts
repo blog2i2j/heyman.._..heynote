@@ -147,7 +147,7 @@ async function createWindow() {
             contextIsolation: true,
         },
         titleBarStyle: "hidden" as const, // customButtonsOnHover
-        trafficLightPosition: { x: 7, y: 7 },
+        trafficLightPosition: { x: 10, y: 10 },
         ...(!isMac ? {
             titleBarOverlay: {
                 color: nativeTheme.shouldUseDarkColors ? TITLE_BAR_BG_DARK : TITLE_BAR_BG_LIGHT,
