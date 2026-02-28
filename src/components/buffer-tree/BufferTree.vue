@@ -177,7 +177,7 @@
             :style="{ '--indent-level': item.level }"
             @click="item.type === 'folder' ? onFolderClick(item.path) : openBuffer(item.path)"
         >
-            <span class="name">{{ item.name }}</span>
+            <span class="name" :title="item.name">{{ item.name }}</span>
         </div>
     </div>
 </template>
