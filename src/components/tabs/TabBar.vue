@@ -156,7 +156,9 @@
                 bottom: -1px
                 width: 100%
                 height: 1px /* when 0 no shadow is displayed*/
-                box-shadow: rgba(0,0,0, 0.5) 0 0 5px 0
+                box-shadow: rgba(0,0,0, 0.15) 0 0 5px 0
+                +dark-mode
+                    box-shadow: rgba(0,0,0, 0.5) 0 0 5px 0
                 //box-shadow: #fff 0 0 5px 0
 
         .scroller
@@ -166,6 +168,11 @@
             overflow-x: auto
             scrollbar-width: none
             app-region: none
+            +dark-mode
+                // needed to make the tabs visually aligned with the editor, since the editor's border-left
+                // (when the left panel is enabled) is much more discreet in dark mode, and looks more like
+                // it's part of the background
+                margin-left: 1px
             ol
                 display: flex
                 list-style: none

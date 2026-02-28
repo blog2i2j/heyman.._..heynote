@@ -29,7 +29,7 @@ export const UPDATE_CHECK_FOR_UPDATES = "auto-update:checkForUpdates"
 
 export const FOLD_LABEL_LENGTH = 50
 
-export const TITLE_BAR_BG_LIGHT = "#f3f2f2"
+export const TITLE_BAR_BG_LIGHT = "#ebebeb"
 export const TITLE_BAR_BG_LIGHT_BLURRED = "#e7e7e7"
 export const TITLE_BAR_BG_DARK = "#1b1c1d"
 export const TITLE_BAR_BG_DARK_BLURRED = "#121313"

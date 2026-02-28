@@ -20,8 +20,8 @@
     import NewBuffer from './NewBuffer.vue'
     import EditBuffer from './EditBuffer.vue'
     import TabBar from './tabs/TabBar.vue'
-    import MainMenuButton from './tabs/MainMenuButton.vue'
     import DrawImageModal from './draw/DrawImageModal.vue'
+    import LeftPanel from './LeftPanel.vue'
 
     export default {
         components: {
@@ -34,8 +34,8 @@
             NewBuffer,
             EditBuffer,
             TabBar,
-            MainMenuButton,
             DrawImageModal,
+            LeftPanel,
         },
 
         data() {
@@ -240,15 +240,10 @@
 <template>
     <div 
         class="container" 
-        :class="{'tab-bar-visible':showTabBar}"
+        :class="{'tab-bar-visible':showTabBar, 'left-panel-visible': showLeftPanel}"
     >   
         <div class="main-container">
-            <div class="left-panel" v-if="showLeftPanel">
-                <div class="top-bar">
-                    <MainMenuButton />
-                </div>
-                <div class="left-panel-content"></div>
-            </div>
+            <LeftPanel v-if="showLeftPanel" />
             <div class="editor-container">
                 <TabBar v-if="showTabBar" />
                 <Editor 
@@ -275,33 +270,32 @@
             class="status" 
         />
         <div class="overlay">
-            <LanguageSelector 
-                v-if="showLanguageSelector" 
-                @selectLanguage="onSelectLanguage"
-                @close="closeDialog"
-            />
-            <BufferSelector 
-                v-if="showBufferSelector || showCommandPalette" 
-                :initialFilter="showCommandPalette ? '>' : ''"
-                :commandsEnabled="true"
-                @openBuffer="openBuffer"
-                @openCreateBuffer="(nameSuggestion) => openCreateBuffer('new', nameSuggestion)"
-                @close="closeBufferSelector"
-            />
-            <BufferSelector 
-                v-if="showMoveToBufferSelector" 
-                headline="Move block to..."
-                :commandsEnabled="false"
-                @openBuffer="onMoveCurrentBlockToOtherEditor"
-                @openCreateBuffer="(nameSuggestion) => openCreateBuffer('currentBlock', nameSuggestion)"
-                @close="closeMoveToBufferSelector"
-            />
-            <Settings 
-                v-if="showSettings"
-                :initialSettings="settingsStore.settings"
-                :themeSetting="settingsStore.themeSetting"
-                @closeSettings="closeSettings"
-            />
+            <div 
+                v-if="showLanguageSelector || showBufferSelector || showCommandPalette || showMoveToBufferSelector"
+                class="popup"
+            >
+                <LanguageSelector 
+                    v-if="showLanguageSelector" 
+                    @selectLanguage="onSelectLanguage"
+                    @close="closeDialog"
+                />
+                <BufferSelector 
+                    v-if="showBufferSelector || showCommandPalette" 
+                    :initialFilter="showCommandPalette ? '>' : ''"
+                    :commandsEnabled="true"
+                    @openBuffer="openBuffer"
+                    @openCreateBuffer="(nameSuggestion) => openCreateBuffer('new', nameSuggestion)"
+                    @close="closeBufferSelector"
+                />
+                <BufferSelector 
+                    v-if="showMoveToBufferSelector" 
+                    headline="Move block to..."
+                    :commandsEnabled="false"
+                    @openBuffer="onMoveCurrentBlockToOtherEditor"
+                    @openCreateBuffer="(nameSuggestion) => openCreateBuffer('currentBlock', nameSuggestion)"
+                    @close="closeMoveToBufferSelector"
+                />
+            </div>
             <NewBuffer 
                 v-if="showCreateBuffer"
                 @close="closeDialog"
@@ -309,6 +303,12 @@
             <EditBuffer 
                 v-if="showEditBuffer"
                 @close="closeDialog"
+            />
+            <Settings 
+                v-if="showSettings"
+                :initialSettings="settingsStore.settings"
+                :themeSetting="settingsStore.themeSetting"
+                @closeSettings="closeSettings"
             />
             <DrawImageModal
                 v-if="showDrawImageModal"
@@ -331,29 +331,25 @@
             height: calc(100% - var(--status-bar-height))
             display: flex
             flex-direction: row
-            .left-panel
-                //app-region: drag
-                width: 260px
-                flex-shrink: 0
-                height: 100%
-                //background: #1f1f1f
-                background: rgb(27, 28, 29)
-                display: flex
-                flex-direction: column
-                .top-bar
-                    height: var(--tab-bar-height)
-                    flex-shrink: 0
-                    app-region: drag
-                .left-panel-content
-                    flex-grow: 1
-                    border-right: 1px solid var(--tab-bar-border-bottom-color)
             .editor-container
                 height: 100%
+                width: calc(100% - 260px)
                 flex-grow: 1
                 .editor
                     height: calc(100% - var(--tab-bar-height))
+        .overlay
+            .popup
+                position: absolute
+                top: var(--tab-bar-height)
+                left: 0
+                right: 0
+                bottom: 0
         .status
             position: absolute
             bottom: 0
             left: 0
+
+        &.left-panel-visible
+            .main-container .editor-container .editor
+                border-left: 1px solid var(--tab-bar-border-bottom-color)
 </style>
