@@ -19,7 +19,7 @@
 </script>
 
 <template>
-    <div class="main-menu-container" v-if="!showLeftPanel">
+    <div class="main-menu-container">
         <button class="main-menu"
             @click="onMainMenuClick"
         ></button>

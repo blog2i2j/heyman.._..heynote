@@ -202,6 +202,10 @@
                 this.heynoteStore.executeCommand("toggleAlwaysOnTop")
             },
 
+            toggleLeftPanel() {
+                this.heynoteStore.executeCommand("toggleLeftPanel")
+            },
+
             onMoveCurrentBlockToOtherEditor(path) {
                 this.editorCacheStore.moveCurrentBlockToOtherEditor(path)
                 this.closeMoveToBufferSelector()
@@ -266,6 +270,7 @@
             @openSettings="showSettings = true"
             @toggleSpellcheck="toggleSpellcheck"
             @toggleAlwaysOnTop="toggleAlwaysOnTop"
+            @toggleLeftPanel="toggleLeftPanel"
             @click="() => {$refs.editor.focus()}"
             class="status" 
         />

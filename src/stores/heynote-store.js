@@ -3,6 +3,7 @@ import { defineStore } from "pinia"
 import { NoteFormat } from "../common/note-format"
 import { toSafeBrowserLocale } from "../util/locale.js"
 import { useEditorCacheStore } from "./editor-cache"
+import { useSettingsStore } from "./settings-store"
 import { 
     SCRATCH_FILE_NAME, WINDOW_FULLSCREEN_STATE, WINDOW_FOCUS_STATE, 
     SAVE_TABS_STATE, LOAD_TABS_STATE, CONTEXT_MENU_CLOSED 
@@ -40,7 +41,7 @@ export const useHeynoteStore = defineStore("heynote", {
         drawImageUrl: null,
         drawImageId: null,
 
-        showLeftPanel: true,
+        showLeftPanel: window.heynote.settings.showLeftPanel ?? false,
         leftPanelWidth: window.heynote.settings.leftPanelWidth ?? 260,
         isFullscreen: false,
         isFocused: true,
@@ -61,6 +62,13 @@ export const useHeynoteStore = defineStore("heynote", {
                 return
             }
             this.currentEditor.focus()
+        },
+
+        toggleLeftPanel() {
+            this.showLeftPanel = !this.showLeftPanel
+            useSettingsStore().updateSettings({
+                showLeftPanel: this.showLeftPanel,
+            })
         },
 
         openBuffer(path) {

@@ -103,6 +103,13 @@ export function toggleAlwaysOnTop(editor) {
     }
 }
 
+export function toggleLeftPanel(editor) {
+    return (view) => {
+        useHeynoteStore().toggleLeftPanel()
+        return true
+    }
+}
+
 const nothing = (view) => {
     return true
 }
@@ -147,6 +154,7 @@ const HEYNOTE_COMMANDS = {
     foldBlock: cmd(foldBlock, "Block", "Fold block"),
     unfoldBlock: cmd(unfoldBlock, "Block", "Unfold block"),
     toggleBlockFold: cmd(toggleBlockFold, "Block", "Toggle block fold"),
+    toggleLeftPanel: cmd(toggleLeftPanel, "Editor", "Toggle left sidebar panel"),
 
     // tab commands
     closeCurrentTab: cmd(closeCurrentTab, "Buffer", "Close current tab"),
