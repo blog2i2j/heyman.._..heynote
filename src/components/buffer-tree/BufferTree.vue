@@ -24,6 +24,7 @@
         async mounted() {
             await this.updateBuffers()
             this.syncFolderOpenState()
+            this.$nextTick(() => this.scrollActiveBufferIntoView())
         },
 
         watch: {
@@ -35,6 +36,7 @@
             },
             currentBufferPath() {
                 this.openCurrentPathFolders()
+                this.$nextTick(() => this.scrollActiveBufferIntoView())
             },
         },
 
@@ -156,6 +158,17 @@
             onFolderClick(path) {
                 this.folderOpenState[path] = !this.folderOpenState[path]
             },
+
+            scrollActiveBufferIntoView() {
+                const activeBuffer = this.$el?.querySelector(".buffer.active")
+                if (!activeBuffer) {
+                    return
+                }
+                activeBuffer.scrollIntoView({
+                    behavior: "auto",
+                    block: "nearest",
+                })
+            },
         },
 
     }
@@ -197,6 +210,8 @@
         font-size: 13px
         line-height: 20px
         padding: 2px 10px
+        scroll-margin-top: 36px
+        scroll-margin-bottom: 36px
         padding-left: calc(22px + var(--indent-level) * 16px)
         //border-radius: 4px
         white-space: nowrap
