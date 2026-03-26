@@ -341,7 +341,7 @@
                 width: calc(100% - var(--left-panel-width))
                 flex-grow: 1
                 .editor
-                    height: calc(100% - var(--tab-bar-height))
+                    height: 100%
         .overlay
             .popup
                 position: absolute
@@ -357,4 +357,7 @@
         &.left-panel-visible
             .main-container .editor-container .editor
                 border-left: 1px solid var(--tab-bar-border-bottom-color)
+        &.tab-bar-visible
+            .main-container .editor-container .editor
+                height: calc(100% - var(--tab-bar-height))
 </style>
