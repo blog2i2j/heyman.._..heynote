@@ -28,7 +28,8 @@ export const useHeynoteStore = defineStore("heynote", {
         libraryId: 0,
         createBufferParams: {
             mode: "new",
-            nameSuggestion: ""
+            nameSuggestion: "",
+            parentPath: "",
         },
 
         showBufferSelector: false,
@@ -203,12 +204,13 @@ export const useHeynoteStore = defineStore("heynote", {
             this.closeDialog()
             this.showMoveToBufferSelector = true
         },
-        openCreateBuffer(createMode, nameSuggestion) {
+        openCreateBuffer(createMode, nameSuggestion, parentPath) {
             createMode = createMode || "new"
             this.closeDialog()
             this.createBufferParams = {
                 mode: createMode || "new",
-                name: nameSuggestion || ""
+                name: nameSuggestion || "",
+                parentPath: parentPath || "",
             }
             this.showCreateBuffer = true
         },
@@ -339,6 +341,16 @@ export const useHeynoteStore = defineStore("heynote", {
             }
 
             await window.heynote.buffer.delete(path)
+            await this.updateBuffers()
+        },
+
+        async deleteDirectory(path) {
+            await window.heynote.buffer.deleteDirectory(path)
+            await this.updateBuffers()
+        },
+
+        async createDirectory(path) {
+            await window.heynote.buffer.createDirectory(path)
             await this.updateBuffers()
         },
 

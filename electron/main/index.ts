@@ -9,7 +9,7 @@ import {
     SCRATCH_FILE_NAME, SAVE_TABS_STATE, LOAD_TABS_STATE, CONTEXT_MENU_CLOSED, GET_SYSTEM_LOCALE,
 } from '@/src/common/constants'
 
-import { menu, getTrayMenu, getEditorContextMenu, getTabContextMenu, getSpellcheckingContextMenu } from './menu'
+import { menu, getTrayMenu, getEditorContextMenu, getTabContextMenu, getBufferTreeContextMenu, getBufferTreeDirectoryContextMenu, getBufferTreeBackgroundContextMenu, getSpellcheckingContextMenu } from './menu'
 import CONFIG from "../config"
 import { isDev, isLinux, isMac, isWindows } from '../detect-platform';
 import { initializeAutoUpdate, checkForUpdates } from './auto-update';
@@ -485,6 +485,31 @@ ipcMain.handle("showTabContextMenu", (event, tabPath) =>  {
         win?.webContents.send(CONTEXT_MENU_CLOSED)
     })
     menu.popup({window: win});
+})
+
+ipcMain.handle("showBufferTreeContextMenu", (event, bufferPath) => {
+    const menu = getBufferTreeContextMenu(win, bufferPath)
+    menu.once("menu-will-close", () => {
+        win?.webContents.send(CONTEXT_MENU_CLOSED)
+    })
+    menu.popup({ window: win })
+})
+
+ipcMain.handle("showBufferTreeDirectoryContextMenu", async (event, directoryPath) => {
+    const isEmptyDirectory = directoryPath ? await fileLibrary?.isDirectoryEmpty(directoryPath) : false
+    const menu = getBufferTreeDirectoryContextMenu(win, directoryPath, !!isEmptyDirectory)
+    menu.once("menu-will-close", () => {
+        win?.webContents.send(CONTEXT_MENU_CLOSED)
+    })
+    menu.popup({ window: win })
+})
+
+ipcMain.handle("showBufferTreeBackgroundContextMenu", () => {
+    const menu = getBufferTreeBackgroundContextMenu(win)
+    menu.once("menu-will-close", () => {
+        win?.webContents.send(CONTEXT_MENU_CLOSED)
+    })
+    menu.popup({ window: win })
 })
 
 ipcMain.handle("showSpellcheckingContextMenu", (event) => {

@@ -2,6 +2,7 @@
     import { mapState, mapActions } from "pinia"
     import { SCRATCH_FILE_NAME } from "@/src/common/constants"
     import { useHeynoteStore } from "@/src/stores/heynote-store"
+    import NewFolderItem from "../folder-selector/NewFolderItem.vue"
 
     const pathSep = window.heynote.buffer.pathSeparator
 
@@ -14,23 +15,54 @@
         return a.name.localeCompare(b.name)
     }
 
+    function hasHiddenDirectorySegment(path) {
+        return path.split(pathSep).some((segment) => segment.startsWith("."))
+    }
+
+    // Render pipeline:
+    // 1) Merge buffers + explicit directory paths into a hierarchical tree.
+    // 2) Flatten that tree into visible rows based on folder open state.
+    // 3) Inject inline "new folder" row at an anchor near the context-menu source item.
     export default {
+        components: {
+            NewFolderItem,
+        },
+
         data() {
             return {
                 folderOpenState: {},
+                directoryPaths: [],
+                newFolderParentPath: null,
+                newFolderAnchorPath: null,
+                newFolderAnchorType: null,
+                lastContextMenuItem: null,
+                backgroundNewFolderPosition: "top",
             }
         },
 
         async mounted() {
-            await this.updateBuffers()
+            await Promise.all([
+                this.updateBuffers(),
+                this.refreshDirectoryList(),
+            ])
             this.syncFolderOpenState()
             this.$nextTick(() => this.scrollActiveBufferIntoView())
+            window._heynote_buffer_tree = this
+            window.heynote.mainProcess.on("bufferTree:createFolder", this.onCreateFolderRequested)
+        },
+
+        beforeUnmount() {
+            if (window._heynote_buffer_tree === this) {
+                window._heynote_buffer_tree = null
+            }
+            window.heynote.mainProcess.off("bufferTree:createFolder", this.onCreateFolderRequested)
         },
 
         watch: {
             buffers: {
                 deep: true,
                 handler() {
+                    this.refreshDirectoryList()
                     this.syncFolderOpenState()
                 },
             },
@@ -48,7 +80,22 @@
 
             visibleItems() {
                 const rows = []
-                const walk = (folder, level) => {
+                const walk = (folder, level, folderPath) => {
+                    const isTargetFolder = this.newFolderParentPath === folderPath
+                    const anchorIsFolder = this.newFolderAnchorType === "folder" && this.newFolderAnchorPath === folderPath
+                    const isRootFolder = folderPath === ""
+                    const insertAtRootTop = isRootFolder && this.newFolderAnchorType === "root-top"
+                    const insertAtRootBottom = isRootFolder && this.newFolderAnchorType === "root-bottom"
+
+                    // Inline new-folder input is inserted relative to where context menu was opened.
+                    if (isTargetFolder && (anchorIsFolder || insertAtRootTop || (!this.newFolderAnchorPath && !isRootFolder))) {
+                        rows.push({
+                            type: "new-folder",
+                            path: folderPath,
+                            level,
+                        })
+                    }
+
                     const folders = [...folder.folders].sort(compareByName)
                     const files = [...folder.files].sort(compareByName)
                     for (const childFolder of folders) {
@@ -60,7 +107,7 @@
                             open: !!this.folderOpenState[childFolder.path],
                         })
                         if (this.folderOpenState[childFolder.path]) {
-                            walk(childFolder, level + 1)
+                            walk(childFolder, level + 1, childFolder.path)
                         }
                     }
                     for (const file of files) {
@@ -72,10 +119,42 @@
                             active: file.path === this.currentBufferPath,
                             scratch: file.path === SCRATCH_FILE_NAME,
                         })
+                        if (
+                            isTargetFolder &&
+                            this.newFolderAnchorType === "buffer" &&
+                            this.newFolderAnchorPath === file.path
+                        ) {
+                            rows.push({
+                                type: "new-folder",
+                                path: folderPath,
+                                level,
+                            })
+                        }
+                    }
+
+                    if (
+                        isTargetFolder &&
+                        this.newFolderAnchorPath &&
+                        this.newFolderAnchorType === "buffer" &&
+                        !files.some((file) => file.path === this.newFolderAnchorPath)
+                    ) {
+                        rows.push({
+                            type: "new-folder",
+                            path: folderPath,
+                            level,
+                        })
+                    }
+
+                    if (isTargetFolder && insertAtRootBottom) {
+                        rows.push({
+                            type: "new-folder",
+                            path: folderPath,
+                            level,
+                        })
                     }
                 }
 
-                walk(this.buildTree(), 0)
+                walk(this.buildTree(), 0, "")
                 return rows
             },
         },
@@ -84,7 +163,13 @@
             ...mapActions(useHeynoteStore, [
                 "updateBuffers",
                 "openBuffer",
+                "createDirectory",
             ]),
+
+            async refreshDirectoryList() {
+                const directories = await window.heynote.buffer.getDirectoryList()
+                this.directoryPaths = directories.filter((path) => !hasHiddenDirectorySegment(path))
+            },
 
             buildTree() {
                 const root = {
@@ -106,9 +191,27 @@
                     return folder
                 }
 
+                // Include explicit directory entries so empty folders appear in the tree.
+                for (const directoryPath of this.directoryPaths) {
+                    if (!directoryPath) {
+                        continue
+                    }
+                    const parts = directoryPath.split(pathSep)
+                    let current = root
+                    let currentPath = ""
+                    for (const folderName of parts) {
+                        currentPath = currentPath ? currentPath + pathSep + folderName : folderName
+                        current = getOrCreateFolder(current, folderName, currentPath)
+                    }
+                }
+
+                // Then attach all buffers to their directory nodes.
                 for (const [bufferPath, metadata] of Object.entries(this.buffers)) {
                     const parts = bufferPath.split(pathSep)
                     const filename = parts.pop()
+                    if (parts.some((part) => part.startsWith("."))) {
+                        continue
+                    }
                     let current = root
                     let currentPath = ""
                     for (const folderName of parts) {
@@ -126,6 +229,9 @@
 
             getFolderPaths() {
                 const folderPaths = []
+                for (const path of this.directoryPaths) {
+                    folderPaths.push(path)
+                }
                 for (const path of Object.keys(this.buffers)) {
                     const parts = path.split(pathSep).slice(0, -1)
                     let currentPath = ""
@@ -159,6 +265,103 @@
                 this.folderOpenState[path] = !this.folderOpenState[path]
             },
 
+            onItemContextMenu(item, event) {
+                if (window.heynote.platform.isWebApp) {
+                    return
+                }
+                event.preventDefault()
+                this.lastContextMenuItem = {
+                    type: item.type,
+                    path: item.path,
+                }
+                if (item.type === "buffer") {
+                    window.heynote.mainProcess.invoke("showBufferTreeContextMenu", item.path)
+                } else if (item.type === "folder") {
+                    window.heynote.mainProcess.invoke("showBufferTreeDirectoryContextMenu", item.path)
+                }
+            },
+
+            onBackgroundContextMenu(event) {
+                if (window.heynote.platform.isWebApp) {
+                    return
+                }
+                if (event.target.closest(".item") || event.target.closest("input")) {
+                    return
+                }
+                event.preventDefault()
+                // For root-level "New Folder..." from empty-space context menu, place input at top or bottom.
+                this.backgroundNewFolderPosition = this.getBackgroundInsertPosition(event.clientY)
+                this.lastContextMenuItem = null
+                window.heynote.mainProcess.invoke("showBufferTreeBackgroundContextMenu")
+            },
+
+            getBackgroundInsertPosition(clickY) {
+                const itemElements = [...(this.$el?.querySelectorAll(".item") || [])]
+                if (itemElements.length === 0) {
+                    return "top"
+                }
+                const firstRect = itemElements[0].getBoundingClientRect()
+                const lastRect = itemElements[itemElements.length - 1].getBoundingClientRect()
+                if (clickY <= firstRect.top) {
+                    return "top"
+                }
+                if (clickY >= lastRect.bottom) {
+                    return "bottom"
+                }
+                const distTop = Math.abs(clickY - firstRect.top)
+                const distBottom = Math.abs(lastRect.bottom - clickY)
+                return distTop <= distBottom ? "top" : "bottom"
+            },
+
+            onCreateFolderRequested(event, parentPath) {
+                this.newFolderParentPath = parentPath || ""
+                this.newFolderAnchorPath = null
+                this.newFolderAnchorType = null
+
+                // If create-folder came from an item context menu, anchor inline input next to that item.
+                if (this.lastContextMenuItem) {
+                    if (
+                        this.lastContextMenuItem.type === "folder" &&
+                        this.lastContextMenuItem.path === this.newFolderParentPath
+                    ) {
+                        this.newFolderAnchorPath = this.lastContextMenuItem.path
+                        this.newFolderAnchorType = "folder"
+                    } else if (this.lastContextMenuItem.type === "buffer") {
+                        const bufferParentPath = this.lastContextMenuItem.path.split(pathSep).slice(0, -1).join(pathSep)
+                        if (bufferParentPath === this.newFolderParentPath) {
+                            this.newFolderAnchorPath = this.lastContextMenuItem.path
+                            this.newFolderAnchorType = "buffer"
+                        }
+                    }
+                } else if (this.newFolderParentPath === "") {
+                    this.newFolderAnchorType = this.backgroundNewFolderPosition === "bottom" ? "root-bottom" : "root-top"
+                }
+
+                if (this.newFolderParentPath) {
+                    const parts = this.newFolderParentPath.split(pathSep)
+                    let currentPath = ""
+                    for (const folderName of parts) {
+                        currentPath = currentPath ? currentPath + pathSep + folderName : folderName
+                        this.folderOpenState[currentPath] = true
+                    }
+                }
+            },
+
+            async onCreateFolder(parentPath, name) {
+                const path = parentPath ? parentPath + pathSep + name : name
+                await this.createDirectory(path)
+                await this.refreshDirectoryList()
+                this.newFolderParentPath = null
+                this.newFolderAnchorPath = null
+                this.newFolderAnchorType = null
+            },
+
+            onCancelCreateFolder() {
+                this.newFolderParentPath = null
+                this.newFolderAnchorPath = null
+                this.newFolderAnchorType = null
+            },
+
             scrollActiveBufferIntoView() {
                 const activeBuffer = this.$el?.querySelector(".buffer.active")
                 if (!activeBuffer) {
@@ -175,23 +378,32 @@
 </script>
 
 <template>
-    <div class="buffer-tree">
-        <div
-            v-for="item in visibleItems"
-            :key="item.type + ':' + item.path"
-            :class="{
-                item: true,
-                folder: item.type === 'folder',
-                buffer: item.type === 'buffer',
-                open: item.open,
-                active: item.active,
-                scratch: item.scratch,
-            }"
-            :style="{ '--indent-level': item.level }"
-            @click="item.type === 'folder' ? onFolderClick(item.path) : openBuffer(item.path)"
-        >
-            <span class="name" :title="item.name">{{ item.name }}</span>
-        </div>
+    <div class="buffer-tree" @contextmenu="onBackgroundContextMenu">
+        <template v-for="item in visibleItems" :key="item.type + ':' + item.path + ':' + item.level">
+            <NewFolderItem
+                v-if="item.type === 'new-folder'"
+                :parentPath="item.path"
+                :level="item.level + 1"
+                @create-folder="onCreateFolder"
+                @cancel="onCancelCreateFolder"
+            />
+            <div
+                v-else
+                :class="{
+                    item: true,
+                    folder: item.type === 'folder',
+                    buffer: item.type === 'buffer',
+                    open: item.open,
+                    active: item.active,
+                    scratch: item.scratch,
+                }"
+                :style="{ '--indent-level': item.level }"
+                @click="item.type === 'folder' ? onFolderClick(item.path) : openBuffer(item.path)"
+                @contextmenu.stop="onItemContextMenu(item, $event)"
+            >
+                <span class="name" :title="item.name">{{ item.name }}</span>
+            </div>
+        </template>
     </div>
 </template>
 
@@ -227,7 +439,7 @@
                 +dark-mode
                     background: rgba(255,255,255, 0.08)
             &.active
-                background: #c5d9cf
+                background: #d4ded9
                 +dark-mode
                     background: #244233
             &.scratch

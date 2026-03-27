@@ -2,6 +2,7 @@ import { SETTINGS_CHANGE_EVENT, OPEN_SETTINGS_EVENT, SAVE_TABS_STATE, LOAD_TABS_
 import { NoteFormat } from "../src/common/note-format";
 
 const NOTE_KEY_PREFIX = "heynote-library__"
+const DIRECTORY_LIST_KEY = "heynote-library-directories"
 
 const mediaMatch = window.matchMedia('(prefers-color-scheme: dark)')
 let themeCallback = null
@@ -101,6 +102,34 @@ function noteKey(path) {
     return NOTE_KEY_PREFIX + path
 }
 
+function getStoredDirectories() {
+    try {
+        return JSON.parse(localStorage.getItem(DIRECTORY_LIST_KEY) || "[]")
+    } catch {
+        return []
+    }
+}
+
+function setStoredDirectories(directories) {
+    localStorage.setItem(DIRECTORY_LIST_KEY, JSON.stringify([...new Set(directories)].sort()))
+}
+
+function getDirectoriesFromNotes() {
+    const directories = new Set()
+    for (let key in localStorage) {
+        if (key.startsWith(NOTE_KEY_PREFIX)) {
+            const path = key.slice(NOTE_KEY_PREFIX.length)
+            const parts = path.split("/")
+            if (parts.length > 1) {
+                for (let i = 1; i < parts.length; i++) {
+                    directories.add(parts.slice(0, i).join("/"))
+                }
+            }
+        }
+    }
+    return [...directories]
+}
+
 function getNoteMetadata(content) {
     const firstSeparator = content.indexOf("\n∞∞∞")
     if (firstSeparator === -1) {
@@ -162,8 +191,36 @@ const Heynote = {
             localStorage.setItem(noteKey(path), content)
         },
 
+        async createDirectory(path) {
+            if (!path) {
+                return
+            }
+            const dirs = getStoredDirectories()
+            dirs.push(path)
+            setStoredDirectories(dirs)
+        },
+
         async delete(path) {
             localStorage.removeItem(noteKey(path))
+        },
+
+        async isDirectoryEmpty(path) {
+            const prefix = path ? path + "/" : ""
+            const hasBuffer = Object.keys(localStorage).some((key) => {
+                if (!key.startsWith(NOTE_KEY_PREFIX)) {
+                    return false
+                }
+                const notePath = key.slice(NOTE_KEY_PREFIX.length)
+                return notePath.startsWith(prefix)
+            })
+            const hasSubDirectory = getStoredDirectories().some((directoryPath) => directoryPath.startsWith(prefix))
+            return !hasBuffer && !hasSubDirectory
+        },
+
+        async deleteDirectory(path) {
+            const directories = getStoredDirectories().filter((directoryPath) => directoryPath !== path)
+            setStoredDirectories(directories)
+            return true
         },
 
         async move(path, newPath) {
@@ -198,19 +255,10 @@ const Heynote = {
         },
 
         async getDirectoryList() {
-            const directories = new Set()
-            for (let key in localStorage) {
-                if (key.startsWith(NOTE_KEY_PREFIX)) {
-                    const path = key.slice(NOTE_KEY_PREFIX.length)
-                    const parts = path.split("/")
-                    if (parts.length > 1) {
-                        for (let i = 1; i < parts.length; i++) {
-                            directories.add(parts.slice(0, i).join("/"))
-                        }
-                    }
-                }
-            }
-            //console.log("directories", directories)
+            const directories = new Set([
+                ...getDirectoriesFromNotes(),
+                ...getStoredDirectories(),
+            ])
             return [...directories]
         },
 

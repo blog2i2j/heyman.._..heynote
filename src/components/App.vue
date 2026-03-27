@@ -65,8 +65,12 @@
                 this.heynoteStore.closeTab(tabPath)
             })
 
-            window.heynote.mainProcess.on('tab:openNew', () => {
-                this.openBufferSelector()
+            window.heynote.mainProcess.on('tab:openNew', (event, directory) => {
+                if (directory !== undefined) {
+                    this.openCreateBuffer("new", "", directory)
+                } else {
+                    this.openBufferSelector()
+                }
             })
 
             window.heynote.mainProcess.on('tab:createNew', () => {
@@ -83,6 +87,16 @@
                 }
                 this.focusEditor()
             })
+
+            window.heynote.mainProcess.on('bufferTree:deleteDirectory', async (event, directoryPath) => {
+                try {
+                    await this.deleteDirectory(directoryPath)
+                } catch (error) {
+                    console.error("Failed to delete directory:", directoryPath, error)
+                }
+                this.focusEditor()
+            })
+
         },
 
         beforeUnmount() {
@@ -158,6 +172,7 @@
                 "closeMoveToBufferSelector",
                 "closeDrawImageModal",
                 "deleteBuffer",
+                "deleteDirectory",
                 "focusEditor",
             ]),
 

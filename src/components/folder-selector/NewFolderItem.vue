@@ -11,6 +11,7 @@
             return {
                 name: "",
                 eventTriggered: false,
+                nameError: false,
             }
         },
 
@@ -51,11 +52,18 @@
                 if (this.eventTriggered) {
                     return
                 }
-                this.eventTriggered = true
                 if (this.name === "") {
+                    this.eventTriggered = true
                     this.$emit("cancel")
                 } else {
-                    this.$emit("create-folder", this.parentPath, sanitizeFilename(this.name, "_"))
+                    const sanitizedName = sanitizeFilename(this.name, "_")
+                    if (!sanitizedName || sanitizedName.startsWith(".")) {
+                        this.nameError = true
+                        this.$nextTick(() => this.$refs.input?.focus())
+                        return
+                    }
+                    this.eventTriggered = true
+                    this.$emit("create-folder", this.parentPath, sanitizedName)
                 }
             },
         },
@@ -70,10 +78,12 @@
         <input 
             type="text" 
             v-model="name"
+            :class="{ error: nameError }"
             ref="input"
             placeholder="New folder name"
             maxlength="60"
             @keydown.stop="onKeyDown"
+            @input="nameError = false"
             @blur="finish"
         />
     </div>
@@ -100,6 +110,8 @@
             padding: 2px 4px
             font-style: italic
             border: 2px solid #48b57e
+            &.error
+                border-color: #b64b4b
             &:focus
                 outline: none
             &::placeholder
