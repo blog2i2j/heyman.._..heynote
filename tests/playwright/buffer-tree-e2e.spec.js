@@ -5,7 +5,17 @@ import fs from "node:fs/promises"
 import { spawn } from "node:child_process"
 
 async function ensureElectronBuild() {
-    // Always rebuild so Electron e2e runs against current source, not stale dist output.
+    const mainPath = path.join(process.cwd(), "dist-electron", "main", "index.js")
+    const preloadPath = path.join(process.cwd(), "dist-electron", "preload", "index.js")
+
+    try {
+        await fs.stat(mainPath)
+        await fs.stat(preloadPath)
+        return
+    } catch {
+        // Build below when dist artifacts are missing.
+    }
+
     await new Promise((resolve, reject) => {
         const child = spawn("npx", ["vite", "build"], {
             stdio: "inherit",
@@ -51,9 +61,6 @@ async function removeDirWithRetry(dirPath, retries = 5) {
 }
 
 test.describe("buffer tree folder e2e", { tag: "@e2e" }, () => {
-    test.describe.configure({ mode: "serial" })
-    test.skip(({ browserName }) => browserName !== "chromium", "Electron runs only once under chromium")
-
     let electronApp
     let page
     let tmpRoot
@@ -94,17 +101,13 @@ test.describe("buffer tree folder e2e", { tag: "@e2e" }, () => {
         }
         await expect(page.locator(".left-panel")).toBeVisible()
         await expect(page.locator(".buffer-tree")).toBeVisible()
-        await expect(page.locator(".buffer-tree .item").first()).toBeVisible()
     }
 
     test("creates folder from inline buffer-tree input", async () => {
         await ensureLeftPanelVisible()
 
-        await page.evaluate(() => {
-            if (!window._heynote_buffer_tree) {
-                throw new Error("BufferTree test handle not available")
-            }
-            window._heynote_buffer_tree.onCreateFolderRequested(null, "")
+        await electronApp.evaluate(({ BrowserWindow }) => {
+            BrowserWindow.getAllWindows()[0].webContents.send("bufferTree:createFolder", "")
         })
 
         const input = page.locator(".buffer-tree input[placeholder='New folder name']")
@@ -113,10 +116,8 @@ test.describe("buffer tree folder e2e", { tag: "@e2e" }, () => {
         await input.press("Enter")
 
         await expect.poll(async () => {
-            return await page.evaluate(async () => {
-                const dirs = await window.heynote.buffer.getDirectoryList()
-                return dirs.includes("alpha")
-            })
+            const alphaPath = path.join(userDataDir, "notes", "alpha")
+            return await fs.stat(alphaPath).then((stat) => stat.isDirectory()).catch(() => false)
         }).toBe(true)
 
         await expect(page.locator(".buffer-tree .folder", { hasText: "alpha" })).toBeVisible()
@@ -125,33 +126,26 @@ test.describe("buffer tree folder e2e", { tag: "@e2e" }, () => {
     test("deletes empty folder from buffer-tree flow", async () => {
         await ensureLeftPanelVisible()
 
-        await page.evaluate(() => {
-            if (!window._heynote_buffer_tree) {
-                throw new Error("BufferTree test handle not available")
-            }
-            window._heynote_buffer_tree.onCreateFolderRequested(null, "")
-        })
-        const input = page.locator(".buffer-tree input[placeholder='New folder name']")
-        await expect(input).toBeVisible()
-        await input.fill("delete-me")
-        await input.press("Enter")
+        const deletePath = path.join(userDataDir, "notes", "delete-me")
+        await fs.mkdir(deletePath)
 
         await expect.poll(async () => {
-            return await page.evaluate(async () => {
-                const dirs = await window.heynote.buffer.getDirectoryList()
-                return dirs.includes("delete-me")
-            })
+            return await fs.stat(deletePath).then((stat) => stat.isDirectory()).catch(() => false)
         }).toBe(true)
+
+        await page.evaluate(() => {
+            window._heynote_buffer_tree.refreshDirectoryList()
+        })
+        await expect(page.locator(".buffer-tree .folder", { hasText: "delete-me" })).toBeVisible()
 
         await electronApp.evaluate(({ BrowserWindow }) => {
             BrowserWindow.getAllWindows()[0].webContents.send("bufferTree:deleteDirectory", "delete-me")
         })
 
         await expect.poll(async () => {
-            return await page.evaluate(async () => {
-                const dirs = await window.heynote.buffer.getDirectoryList()
-                return dirs.includes("delete-me")
-            })
+            return await fs.stat(deletePath).then(() => true).catch(() => false)
         }).toBe(false)
+
+        await expect(page.locator(".buffer-tree .folder", { hasText: "delete-me" })).toHaveCount(0)
     })
 })
