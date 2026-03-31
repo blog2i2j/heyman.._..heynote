@@ -65,11 +65,17 @@ export const useHeynoteStore = defineStore("heynote", {
             this.currentEditor.focus()
         },
 
+        setLeftPanelVisible(visible, persist = true) {
+            this.showLeftPanel = visible
+            if (persist) {
+                useSettingsStore().updateSettings({
+                    showLeftPanel: this.showLeftPanel,
+                })
+            }
+        },
+
         toggleLeftPanel() {
-            this.showLeftPanel = !this.showLeftPanel
-            useSettingsStore().updateSettings({
-                showLeftPanel: this.showLeftPanel,
-            })
+            this.setLeftPanelVisible(!this.showLeftPanel, true)
         },
 
         openBuffer(path) {
