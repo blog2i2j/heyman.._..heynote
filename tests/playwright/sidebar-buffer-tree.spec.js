@@ -12,6 +12,7 @@ function installLibraryState() {
     const settings = {
         showLeftPanel: true,
         leftPanelWidth: 260,
+        bufferTreeOpenFolders: ["folder-a", "missing-folder"],
     }
     const notes = {
         "scratch.txt": createBufferContent("Scratch", "Scratch content"),
@@ -43,10 +44,17 @@ test.describe("sidebar buffer tree", () => {
 
         await expect(page.locator(".buffer-tree .buffer", { hasText: "Scratch" })).toBeVisible()
         await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
-        await expect(page.locator(".buffer-tree .buffer", { hasText: "Nested Note" })).toHaveCount(0)
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Nested Note" })).toBeVisible()
+        await expect.poll(async () => {
+            const settings = JSON.parse(await page.evaluate(() => localStorage.getItem("settings") || "{}"))
+            return settings.bufferTreeOpenFolders || []
+        }).toEqual(["folder-a"])
 
         await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
-        await expect(page.locator(".buffer-tree .buffer", { hasText: "Nested Note" })).toBeVisible()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Nested Note" })).toHaveCount(0)
+        await expect(page.locator(".buffer-tree .folder", { hasText: "folder-b" })).toHaveCount(0)
+
+        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
         await expect(page.locator(".buffer-tree .folder", { hasText: "folder-b" })).toBeVisible()
 
         await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
@@ -57,7 +65,6 @@ test.describe("sidebar buffer tree", () => {
     })
 
     test("opens selected buffer from tree", async ({ page }) => {
-        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
         await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
         await page.locator(".buffer-tree .buffer", { hasText: "Deep Note" }).click()
 
@@ -76,6 +83,18 @@ test.describe("sidebar buffer tree", () => {
 
         await page.locator(".status .status-block.sidebar").click()
         await expect(page.locator(".left-panel")).toBeVisible()
+    })
+
+    test("restores open folders when sidebar is remounted", async ({ page }) => {
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })).toBeVisible()
+
+        await page.locator(".status .status-block.sidebar").click()
+        await expect(page.locator(".left-panel")).toHaveCount(0)
+        await page.locator(".status .status-block.sidebar").click()
+        await expect(page.locator(".left-panel")).toBeVisible()
+
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })).toBeVisible()
     })
 
     test("toggleLeftPanel command toggles left panel", async ({ page }) => {
@@ -123,12 +142,10 @@ test.describe("sidebar buffer tree", () => {
             })
         }).toBe(true)
 
-        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
         await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
     })
 
     test("drops buffer on nested buffer and moves to that subdirectory", async ({ page }) => {
-        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
         await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
 
         const source = page.locator(".buffer-tree .buffer", { hasText: "Root Note" })
@@ -147,7 +164,6 @@ test.describe("sidebar buffer tree", () => {
     })
 
     test("does not move buffer when dropped on itself", async ({ page }) => {
-        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
         await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
 
         const source = page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })

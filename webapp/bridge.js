@@ -88,6 +88,7 @@ let initialSettings = {
     emacsMetaKey: "alt",
     showLineNumberGutter: true,
     showFoldGutter: true,
+    bufferTreeOpenFolders: [],
     bracketClosing: false,
     keyBindings: [],
     showTabs: true,

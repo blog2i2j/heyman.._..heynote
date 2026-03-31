@@ -2,6 +2,7 @@
     import { mapState, mapActions } from "pinia"
     import { SCRATCH_FILE_NAME } from "@/src/common/constants"
     import { useHeynoteStore } from "@/src/stores/heynote-store"
+    import { useSettingsStore } from "@/src/stores/settings-store"
     import NewFolderItem from "../folder-selector/NewFolderItem.vue"
 
     const pathSep = window.heynote.buffer.pathSeparator
@@ -19,6 +20,21 @@
         return path.split(pathSep).some((segment) => segment.startsWith("."))
     }
 
+    function getInitialOpenState() {
+        const settingsStore = useSettingsStore()
+        const persisted = settingsStore.settings.bufferTreeOpenFolders
+            ?? window.heynote.settings.bufferTreeOpenFolders
+        if (!Array.isArray(persisted)) {
+            return {}
+        }
+        return persisted.reduce((state, path) => {
+            if (typeof path === "string" && path.length > 0) {
+                state[path] = true
+            }
+            return state
+        }, {})
+    }
+
     // Render pipeline:
     // 1) Merge buffers + explicit directory paths into a hierarchical tree.
     // 2) Flatten that tree into visible rows based on folder open state.
@@ -30,7 +46,7 @@
 
         data() {
             return {
-                folderOpenState: {},
+                folderOpenState: getInitialOpenState(),
                 directoryPaths: [],
                 newFolderParentPath: null,
                 newFolderAnchorPath: null,
@@ -70,6 +86,7 @@
             },
             currentBufferPath() {
                 this.openCurrentPathFolders()
+                this.persistFolderOpenState()
                 this.$nextTick(() => this.scrollActiveBufferIntoView())
             },
         },
@@ -262,10 +279,26 @@
                 }
                 this.folderOpenState = nextState
                 this.openCurrentPathFolders()
+                this.persistFolderOpenState()
             },
 
             onFolderClick(path) {
                 this.folderOpenState[path] = !this.folderOpenState[path]
+                this.persistFolderOpenState()
+            },
+
+            persistFolderOpenState() {
+                const settingsStore = useSettingsStore()
+                const openFolders = Object.keys(this.folderOpenState)
+                    .filter((path) => this.folderOpenState[path])
+                    .sort()
+                const persisted = [...(settingsStore.settings.bufferTreeOpenFolders || [])].sort()
+                if (JSON.stringify(openFolders) === JSON.stringify(persisted)) {
+                    return
+                }
+                settingsStore.updateSettings({
+                    bufferTreeOpenFolders: openFolders,
+                })
             },
 
             onItemContextMenu(item, event) {
@@ -347,6 +380,7 @@
                         currentPath = currentPath ? currentPath + pathSep + folderName : folderName
                         this.folderOpenState[currentPath] = true
                     }
+                    this.persistFolderOpenState()
                 }
             },
 
