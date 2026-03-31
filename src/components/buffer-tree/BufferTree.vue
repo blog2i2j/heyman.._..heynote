@@ -37,6 +37,8 @@
                 newFolderAnchorType: null,
                 lastContextMenuItem: null,
                 backgroundNewFolderPosition: "top",
+                draggingBufferPath: null,
+                dragOverFolderPath: null,
             }
         },
 
@@ -164,6 +166,7 @@
                 "updateBuffers",
                 "openBuffer",
                 "createDirectory",
+                "moveBuffer",
             ]),
 
             async refreshDirectoryList() {
@@ -362,6 +365,135 @@
                 this.newFolderAnchorType = null
             },
 
+            getParentPath(path) {
+                return path.split(pathSep).slice(0, -1).join(pathSep)
+            },
+
+            buildPath(parentPath, filename) {
+                return parentPath ? parentPath + pathSep + filename : filename
+            },
+
+            canMoveBufferToDirectory(bufferPath, targetDirectory) {
+                if (!bufferPath || bufferPath === SCRATCH_FILE_NAME) {
+                    return false
+                }
+                const sourceDirectory = this.getParentPath(bufferPath)
+                if (sourceDirectory === targetDirectory) {
+                    return false
+                }
+                const filename = bufferPath.split(pathSep).at(-1)
+                const targetPath = this.buildPath(targetDirectory, filename)
+                return !this.buffers[targetPath]
+            },
+
+            onBufferDragStart(path, event) {
+                if (!path || path === SCRATCH_FILE_NAME) {
+                    event.preventDefault()
+                    return
+                }
+                this.draggingBufferPath = path
+                this.dragOverFolderPath = null
+                event.dataTransfer.effectAllowed = "move"
+                event.dataTransfer.setData("text/plain", path)
+            },
+
+            onBufferDragEnd() {
+                this.draggingBufferPath = null
+                this.dragOverFolderPath = null
+            },
+
+            onFolderDragOver(path, event) {
+                if (!this.draggingBufferPath || !this.canMoveBufferToDirectory(this.draggingBufferPath, path)) {
+                    this.dragOverFolderPath = null
+                    return
+                }
+                event.preventDefault()
+                event.dataTransfer.dropEffect = "move"
+                this.dragOverFolderPath = path
+            },
+
+            async onFolderDrop(path, event) {
+                if (!this.draggingBufferPath || !this.canMoveBufferToDirectory(this.draggingBufferPath, path)) {
+                    return
+                }
+                event.preventDefault()
+                const sourcePath = this.draggingBufferPath
+                const filename = sourcePath.split(pathSep).at(-1)
+                const targetPath = this.buildPath(path, filename)
+                await this.moveBuffer(sourcePath, targetPath)
+                this.draggingBufferPath = null
+                this.dragOverFolderPath = null
+            },
+
+            onBufferDragOver(path, event) {
+                if (!this.draggingBufferPath) {
+                    this.dragOverFolderPath = null
+                    return
+                }
+                const targetDirectory = this.getParentPath(path)
+                if (!this.canMoveBufferToDirectory(this.draggingBufferPath, targetDirectory)) {
+                    this.dragOverFolderPath = null
+                    return
+                }
+                event.preventDefault()
+                event.dataTransfer.dropEffect = "move"
+                this.dragOverFolderPath = targetDirectory
+            },
+
+            async onBufferDrop(path, event) {
+                if (!this.draggingBufferPath) {
+                    return
+                }
+                const targetDirectory = this.getParentPath(path)
+                if (!this.canMoveBufferToDirectory(this.draggingBufferPath, targetDirectory)) {
+                    return
+                }
+                event.preventDefault()
+                const sourcePath = this.draggingBufferPath
+                const filename = sourcePath.split(pathSep).at(-1)
+                const targetPath = this.buildPath(targetDirectory, filename)
+                await this.moveBuffer(sourcePath, targetPath)
+                this.draggingBufferPath = null
+                this.dragOverFolderPath = null
+            },
+
+            onTreeDragOver(event) {
+                if (!this.draggingBufferPath) {
+                    this.dragOverFolderPath = null
+                    return
+                }
+                if (event.target.closest(".item")) {
+                    return
+                }
+                if (!this.canMoveBufferToDirectory(this.draggingBufferPath, "")) {
+                    this.dragOverFolderPath = null
+                    return
+                }
+                event.preventDefault()
+                event.dataTransfer.dropEffect = "move"
+                this.dragOverFolderPath = ""
+            },
+
+            async onTreeDrop(event) {
+                if (!this.draggingBufferPath) {
+                    return
+                }
+                if (event.target.closest(".item")) {
+                    return
+                }
+                if (!this.canMoveBufferToDirectory(this.draggingBufferPath, "")) {
+                    this.dragOverFolderPath = null
+                    return
+                }
+                event.preventDefault()
+                const sourcePath = this.draggingBufferPath
+                const filename = sourcePath.split(pathSep).at(-1)
+                const targetPath = this.buildPath("", filename)
+                await this.moveBuffer(sourcePath, targetPath)
+                this.draggingBufferPath = null
+                this.dragOverFolderPath = null
+            },
+
             scrollActiveBufferIntoView() {
                 const activeBuffer = this.$el?.querySelector(".buffer.active")
                 if (!activeBuffer) {
@@ -378,7 +510,12 @@
 </script>
 
 <template>
-    <div class="buffer-tree" @contextmenu="onBackgroundContextMenu">
+    <div
+        :class="{ 'buffer-tree': true, 'root-drop-target': draggingBufferPath && dragOverFolderPath === '' }"
+        @contextmenu="onBackgroundContextMenu"
+        @dragover="onTreeDragOver"
+        @drop="onTreeDrop"
+    >
         <template v-for="item in visibleItems" :key="item.type + ':' + item.path + ':' + item.level">
             <NewFolderItem
                 v-if="item.type === 'new-folder'"
@@ -396,10 +533,16 @@
                     open: item.open,
                     active: item.active,
                     scratch: item.scratch,
+                    'drop-target': item.type === 'folder' && dragOverFolderPath === item.path,
                 }"
                 :style="{ '--indent-level': item.level }"
+                :draggable="item.type === 'buffer' && !item.scratch"
                 @click="item.type === 'folder' ? onFolderClick(item.path) : openBuffer(item.path)"
                 @contextmenu.stop="onItemContextMenu(item, $event)"
+                @dragstart="item.type === 'buffer' ? onBufferDragStart(item.path, $event) : null"
+                @dragend="item.type === 'buffer' ? onBufferDragEnd() : null"
+                @dragover="item.type === 'folder' ? onFolderDragOver(item.path, $event) : item.type === 'buffer' ? onBufferDragOver(item.path, $event) : null"
+                @drop="item.type === 'folder' ? onFolderDrop(item.path, $event) : item.type === 'buffer' ? onBufferDrop(item.path, $event) : null"
             >
                 <span class="name" :title="item.name">{{ item.name }}</span>
             </div>
@@ -416,6 +559,10 @@
         overflow-x: hidden
         padding: 4px 0
         box-sizing: border-box
+        &.root-drop-target
+            background: rgba(0,0,0, 0.05)
+            +dark-mode
+                background: rgba(255,255,255, 0.08)
 
     .item
         user-select: none
@@ -460,6 +607,10 @@
                 background-image: url('@/assets/icons/caret-down.svg')
                 +dark-mode
                     background-image: url('@/assets/icons/caret-down-white.svg')
+            &.drop-target
+                background-color: rgba(0,0,0, 0.10)
+                +dark-mode
+                    background-color: rgba(255,255,255, 0.16)
 
     .name
         display: block

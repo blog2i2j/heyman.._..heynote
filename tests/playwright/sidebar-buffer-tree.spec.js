@@ -109,4 +109,55 @@ test.describe("sidebar buffer tree", () => {
         const after = await leftPanel.boundingBox()
         expect(after.width).toBeGreaterThan(before.width + 100)
     })
+
+    test("moves buffer into folder by drag and drop", async ({ page }) => {
+        const source = page.locator(".buffer-tree .buffer", { hasText: "Root Note" })
+        const target = page.locator(".buffer-tree .folder", { hasText: "folder-a" })
+
+        await source.dragTo(target)
+
+        await expect.poll(async () => {
+            return await page.evaluate(async () => {
+                const buffers = await window.heynote.buffer.getList()
+                return !!buffers["folder-a/root-note.txt"] && !buffers["root-note.txt"]
+            })
+        }).toBe(true)
+
+        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
+    })
+
+    test("drops buffer on nested buffer and moves to that subdirectory", async ({ page }) => {
+        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+
+        const source = page.locator(".buffer-tree .buffer", { hasText: "Root Note" })
+        const nestedTargetBuffer = page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })
+
+        await source.dragTo(nestedTargetBuffer)
+
+        await expect.poll(async () => {
+            return await page.evaluate(async () => {
+                const buffers = await window.heynote.buffer.getList()
+                return !!buffers["folder-a/folder-b/root-note.txt"] && !buffers["root-note.txt"]
+            })
+        }).toBe(true)
+
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
+    })
+
+    test("does not move buffer when dropped on itself", async ({ page }) => {
+        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+
+        const source = page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })
+        await source.dragTo(source)
+
+        await expect.poll(async () => {
+            return await page.evaluate(async () => {
+                const buffers = await window.heynote.buffer.getList()
+                return !!buffers["folder-a/folder-b/deep-note.txt"] && !buffers["deep-note.txt"]
+            })
+        }).toBe(true)
+    })
 })

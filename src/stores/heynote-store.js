@@ -308,12 +308,49 @@ export const useHeynoteStore = defineStore("heynote", {
             toRaw(this.currentEditor).setName(name)
             await (toRaw(this.currentEditor)).save()
             if (newPath && path !== newPath) {
-                //console.log("moving note", path, newPath)
+                await this.moveBuffer(path, newPath)
+                return
+            }
+            await this.updateBuffers()
+        },
+
+        async moveBuffer(path, newPath) {
+            if (!newPath || path === newPath) {
+                return
+            }
+            if (this.buffers[newPath]) {
+                throw new Error(`Note already exists: ${newPath}`)
+            }
+
+            const editorCacheStore = useEditorCacheStore()
+            const sourceEditor = toRaw(editorCacheStore.cache[path])
+
+            // Flush unsaved in-memory state before the underlying file move.
+            if (sourceEditor) {
+                await sourceEditor.save()
+            }
+
+            const wasCurrentBuffer = this.currentBufferPath === path
+            const replacePath = (entryPath) => entryPath === path ? newPath : entryPath
+
+            if (!wasCurrentBuffer) {
+                this.openTabs = this.openTabs.map(replacePath)
+                this.recentBufferPaths = this.recentBufferPaths.map(replacePath)
+                this.closedTabs = this.closedTabs.map((closedTab) => ({
+                    ...closedTab,
+                    path: replacePath(closedTab.path),
+                }))
+                editorCacheStore.freeEditor(path)
+            }
+
+            await window.heynote.buffer.move(path, newPath)
+
+            if (wasCurrentBuffer) {
                 this.closeTab(path)
-                await window.heynote.buffer.move(path, newPath)
                 this.openBuffer(newPath)
             }
-            this.updateBuffers()
+
+            await this.updateBuffers()
         },
 
         async deleteBuffer(path) {
