@@ -124,3 +124,17 @@ Block C`)
 ∞∞∞text-a;created=[^∞\\n]+
 `))
 })
+
+test("folder selector hides dot-prefixed folders", async ({ page }) => {
+    await page.evaluate(async () => {
+        await window.heynote.buffer.createDirectory(".secret")
+        await window.heynote.buffer.createDirectory("visible")
+        await window.heynote.buffer.createDirectory("visible/.nested-hidden")
+    })
+
+    await page.locator("body").press(heynotePage.agnosticKey("Mod+N"))
+    await expect(page.locator(".new-buffer")).toBeVisible()
+    await expect(page.locator(".folder-select-container .folder", { hasText: "visible" })).toBeVisible()
+    await expect(page.locator(".folder-select-container .folder", { hasText: ".secret" })).toHaveCount(0)
+    await expect(page.locator(".folder-select-container .folder", { hasText: ".nested-hidden" })).toHaveCount(0)
+})
