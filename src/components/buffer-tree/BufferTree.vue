@@ -184,6 +184,7 @@
                 "openBuffer",
                 "createDirectory",
                 "moveBuffer",
+                "focusEditor",
             ]),
 
             async refreshDirectoryList() {
@@ -457,6 +458,7 @@
                 await this.moveBuffer(sourcePath, targetPath)
                 this.draggingBufferPath = null
                 this.dragOverFolderPath = null
+                this.$nextTick(() => this.focusEditor())
             },
 
             onBufferDragOver(path, event) {
@@ -489,6 +491,7 @@
                 await this.moveBuffer(sourcePath, targetPath)
                 this.draggingBufferPath = null
                 this.dragOverFolderPath = null
+                this.$nextTick(() => this.focusEditor())
             },
 
             onTreeDragOver(event) {
@@ -526,6 +529,7 @@
                 await this.moveBuffer(sourcePath, targetPath)
                 this.draggingBufferPath = null
                 this.dragOverFolderPath = null
+                this.$nextTick(() => this.focusEditor())
             },
 
             scrollActiveBufferIntoView() {

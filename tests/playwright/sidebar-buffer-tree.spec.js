@@ -143,6 +143,7 @@ test.describe("sidebar buffer tree", () => {
         }).toBe(true)
 
         await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
+        await expect(page.locator(".cm-editor")).toHaveClass(/cm-focused/)
     })
 
     test("drops buffer on nested buffer and moves to that subdirectory", async ({ page }) => {
