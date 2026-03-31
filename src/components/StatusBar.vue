@@ -108,7 +108,7 @@
         <div 
             @click.stop="$emit('toggleLeftPanel')"
             class="status-block sidebar clickable"
-            title="Toggle Sidebar"
+            :title="getTooltip('Toggle Sidebar', 'toggleLeftPanel')"
         >
             <span class="icon icon-format"></span>
         </div>
