@@ -11,7 +11,7 @@ function createBufferContent(name, content = "") {
 function installLibraryState() {
     const settings = {
         showLeftPanel: true,
-        leftPanelWidth: 260,
+        leftPanelWidth: 220,
         bufferTreeOpenFolders: ["folder-a", "missing-folder"],
     }
     const notes = {
