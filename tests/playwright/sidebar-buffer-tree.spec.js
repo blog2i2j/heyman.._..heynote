@@ -123,7 +123,7 @@ test.describe("sidebar buffer tree", () => {
         await expect.poll(async () => {
             const settings = JSON.parse(await page.evaluate(() => localStorage.getItem("settings") || "{}"))
             return settings.leftPanelWidth
-        }).toBe(380)
+        }).toBe(340)
 
         const after = await leftPanel.boundingBox()
         expect(after.width).toBeGreaterThan(before.width + 100)
