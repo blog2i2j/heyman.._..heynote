@@ -13,8 +13,6 @@ You can now turn on a sidebar with a tree view of all your buffers and directori
   <img src="https://heynote.com/img/light/buffer-tree.png" width="400" alt="New sidebar buffer tree feature">
 </picture>
 
-
-
 ### Other changes
 
 - Persist the search query between different buffers, and between restarts
