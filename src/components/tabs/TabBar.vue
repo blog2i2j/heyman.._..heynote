@@ -93,7 +93,7 @@
     <nav :class="className" :style="style">
         <MainMenuButton v-if="!showLeftPanel" />
         <template v-if="showTabs">
-            <div class="scroller">
+            <div class="scroller" tabindex="-1">
                 <draggable 
                     :list="tabs" 
                     tag="ol"
