@@ -219,6 +219,7 @@
 
             toggleLeftPanel() {
                 this.heynoteStore.executeCommand("toggleLeftPanel")
+                this.focusEditor()
             },
 
             onMoveCurrentBlockToOtherEditor(path) {
