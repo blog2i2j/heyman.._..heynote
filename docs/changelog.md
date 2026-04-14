@@ -4,6 +4,17 @@ Here are the most notable changes in each release. For a more detailed list of c
 
 ## Not yet released
 
+### Sidebar with tree view of the note buffers
+
+You can now turn on a sidebar with a tree view of all your buffers and directories.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://heynote.com/img/dark/buffer-tree.png">
+  <img src="https://heynote.com/img/light/buffer-tree.png" width="400" alt="New sidebar buffer tree feature">
+</picture>
+
+### Other changes
+
 - Persist the search query between different buffers, and between restarts
 
 

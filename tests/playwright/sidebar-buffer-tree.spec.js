@@ -1,0 +1,180 @@
+import { expect, test } from "@playwright/test"
+import { HeynotePage } from "./test-utils.js"
+
+function createBufferContent(name, content = "") {
+    return JSON.stringify({
+        formatVersion: "2.0.0",
+        name,
+    }) + `\n∞∞∞text-a;created=2026-01-01T00:00:00.000Z\n${content}`
+}
+
+function installLibraryState() {
+    const settings = {
+        showLeftPanel: true,
+        leftPanelWidth: 220,
+        bufferTreeOpenFolders: ["folder-a", "missing-folder"],
+    }
+    const notes = {
+        "scratch.txt": createBufferContent("Scratch", "Scratch content"),
+        "root-note.txt": createBufferContent("Root Note", "Root content"),
+        "folder-a/nested-note.txt": createBufferContent("Nested Note", "Nested content"),
+        "folder-a/folder-b/deep-note.txt": createBufferContent("Deep Note", "Deep content"),
+    }
+    return { settings, notes }
+}
+
+test.describe("sidebar buffer tree", () => {
+    test.beforeEach(async ({ page }) => {
+        const state = installLibraryState()
+        await page.addInitScript((seed) => {
+            localStorage.clear()
+            localStorage.setItem("settings", JSON.stringify(seed.settings))
+            for (const [path, content] of Object.entries(seed.notes)) {
+                localStorage.setItem(`heynote-library__${path}`, content)
+            }
+        }, state)
+
+        const heynotePage = new HeynotePage(page)
+        await heynotePage.goto()
+    })
+
+    test("renders tree and toggles folders", async ({ page }) => {
+        const tree = page.locator(".buffer-tree")
+        await expect(tree).toBeVisible()
+
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Scratch" })).toBeVisible()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Nested Note" })).toBeVisible()
+        await expect.poll(async () => {
+            const settings = JSON.parse(await page.evaluate(() => localStorage.getItem("settings") || "{}"))
+            return settings.bufferTreeOpenFolders || []
+        }).toEqual(["folder-a"])
+
+        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Nested Note" })).toHaveCount(0)
+        await expect(page.locator(".buffer-tree .folder", { hasText: "folder-b" })).toHaveCount(0)
+
+        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
+        await expect(page.locator(".buffer-tree .folder", { hasText: "folder-b" })).toBeVisible()
+
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })).toBeVisible()
+
+        await page.locator(".buffer-tree .folder", { hasText: "folder-a" }).click()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Nested Note" })).toHaveCount(0)
+    })
+
+    test("opens selected buffer from tree", async ({ page }) => {
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+        await page.locator(".buffer-tree .buffer", { hasText: "Deep Note" }).click()
+
+        await expect(page.locator(".status .note")).toContainText("Deep Note")
+        await expect(page.locator(".buffer-tree .buffer.active", { hasText: "Deep Note" })).toBeVisible()
+        await expect.poll(async () => {
+            return await page.evaluate(() => window._heynote_editor.getContent())
+        }).toContain("Deep content")
+    })
+
+    test("status bar sidebar button toggles left panel", async ({ page }) => {
+        await expect(page.locator(".left-panel")).toBeVisible()
+
+        await page.locator(".status .status-block.sidebar").click()
+        await expect(page.locator(".left-panel")).toHaveCount(0)
+
+        await page.locator(".status .status-block.sidebar").click()
+        await expect(page.locator(".left-panel")).toBeVisible()
+    })
+
+    test("restores open folders when sidebar is remounted", async ({ page }) => {
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })).toBeVisible()
+
+        await page.locator(".status .status-block.sidebar").click()
+        await expect(page.locator(".left-panel")).toHaveCount(0)
+        await page.locator(".status .status-block.sidebar").click()
+        await expect(page.locator(".left-panel")).toBeVisible()
+
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })).toBeVisible()
+    })
+
+    test("toggleLeftPanel command toggles left panel", async ({ page }) => {
+        await expect(page.locator(".left-panel")).toBeVisible()
+
+        await page.evaluate(() => window._heynote_editor.executeCommand("toggleLeftPanel"))
+        await expect(page.locator(".left-panel")).toHaveCount(0)
+
+        await page.evaluate(() => window._heynote_editor.executeCommand("toggleLeftPanel"))
+        await expect(page.locator(".left-panel")).toBeVisible()
+    })
+
+    test("resizes panel and persists width on mouseup", async ({ page }) => {
+        const leftPanel = page.locator(".left-panel")
+        const resizer = page.locator(".left-panel .resizer")
+        const before = await leftPanel.boundingBox()
+        expect(before).not.toBeNull()
+
+        const startX = before.x + before.width - 1
+        const y = before.y + 20
+        await page.mouse.move(startX, y)
+        await page.mouse.down()
+        await page.mouse.move(startX + 120, y)
+        await page.mouse.up()
+
+        await expect.poll(async () => {
+            const settings = JSON.parse(await page.evaluate(() => localStorage.getItem("settings") || "{}"))
+            return settings.leftPanelWidth
+        }).toBe(340)
+
+        const after = await leftPanel.boundingBox()
+        expect(after.width).toBeGreaterThan(before.width + 100)
+    })
+
+    test("moves buffer into folder by drag and drop", async ({ page }) => {
+        const source = page.locator(".buffer-tree .buffer", { hasText: "Root Note" })
+        const target = page.locator(".buffer-tree .folder", { hasText: "folder-a" })
+
+        await source.dragTo(target)
+
+        await expect.poll(async () => {
+            return await page.evaluate(async () => {
+                const buffers = await window.heynote.buffer.getList()
+                return !!buffers["folder-a/root-note.txt"] && !buffers["root-note.txt"]
+            })
+        }).toBe(true)
+
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
+        await expect(page.locator(".cm-editor")).toHaveClass(/cm-focused/)
+    })
+
+    test("drops buffer on nested buffer and moves to that subdirectory", async ({ page }) => {
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+
+        const source = page.locator(".buffer-tree .buffer", { hasText: "Root Note" })
+        const nestedTargetBuffer = page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })
+
+        await source.dragTo(nestedTargetBuffer)
+
+        await expect.poll(async () => {
+            return await page.evaluate(async () => {
+                const buffers = await window.heynote.buffer.getList()
+                return !!buffers["folder-a/folder-b/root-note.txt"] && !buffers["root-note.txt"]
+            })
+        }).toBe(true)
+
+        await expect(page.locator(".buffer-tree .buffer", { hasText: "Root Note" })).toBeVisible()
+    })
+
+    test("does not move buffer when dropped on itself", async ({ page }) => {
+        await page.locator(".buffer-tree .folder", { hasText: "folder-b" }).click()
+
+        const source = page.locator(".buffer-tree .buffer", { hasText: "Deep Note" })
+        await source.dragTo(source)
+
+        await expect.poll(async () => {
+            return await page.evaluate(async () => {
+                const buffers = await window.heynote.buffer.getList()
+                return !!buffers["folder-a/folder-b/deep-note.txt"] && !buffers["deep-note.txt"]
+            })
+        }).toBe(true)
+    })
+})

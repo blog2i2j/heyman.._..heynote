@@ -35,6 +35,7 @@
                 this.$refs.nameInput.focus()
             }
 
+            this.parentPath = this.targetDirectory
             this.updateBuffers()
 
             // build directory tree
@@ -62,7 +63,7 @@
                             name: part,
                             children: [],
                             path: currentPath,
-                            open: this.currentBufferPath.startsWith(currentPath),
+                            open: this.targetDirectory.startsWith(currentPath),
                         }
                         currentLevel.children.push(node)
                         currentLevel = node
@@ -82,6 +83,14 @@
 
             currentNoteDirectory() {
                 return this.currentBufferPath.split(pathSep).slice(0, -1).join(pathSep)
+            },
+
+            targetDirectory() {
+                return this.createBufferParams.parentPath || this.currentNoteDirectory
+            },
+
+            initialDirectory() {
+                return this.parentPath || this.currentNoteDirectory
             },
 
             nameInputClass() {
@@ -199,7 +208,7 @@
                 <FolderSelector 
                     v-if="directoryTree"
                     :directoryTree="directoryTree"
-                    :selectedPath="currentNoteDirectory"
+                    :selectedPath="initialDirectory"
                     id="folder-select" 
                     v-model="parentPath"
                     ref="folderSelect"

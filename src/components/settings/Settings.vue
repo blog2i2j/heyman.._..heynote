@@ -2,6 +2,7 @@
     import { toRaw} from 'vue';
     import { mapStores, mapState } from 'pinia'
     import { useSettingsStore } from "@/src/stores/settings-store.js"
+    import { useHeynoteStore } from "@/src/stores/heynote-store"
 
     import { LANGUAGES } from '../../editor/languages.js'
     import KeyboardHotkey from "./KeyboardHotkey.vue"
@@ -43,6 +44,7 @@
                 showWhitespace: this.initialSettings.showWhitespace,
                 showTabs: this.initialSettings.showTabs,
                 showTabsInFullscreen: this.initialSettings.showTabsInFullscreen,
+                showLeftPanel: this.initialSettings.showLeftPanel ?? false,
                 allowBetaVersions: this.initialSettings.allowBetaVersions,
                 enableGlobalHotkey: this.initialSettings.enableGlobalHotkey,
                 globalHotkey: this.initialSettings.globalHotkey,
@@ -103,7 +105,7 @@
         },
 
         computed: {
-            ...mapStores(useSettingsStore),
+            ...mapStores(useSettingsStore, useHeynoteStore),
         },
 
         methods: {
@@ -114,12 +116,16 @@
             },
 
             updateSettings() {
+                if (this.heynoteStore.showLeftPanel !== this.showLeftPanel) {
+                    this.heynoteStore.setLeftPanelVisible(this.showLeftPanel, false)
+                }
                 this.settingsStore.updateSettings({
                     showLineNumberGutter: this.showLineNumberGutter,
                     showFoldGutter: this.showFoldGutter,
                     showWhitespace: this.showWhitespace,
                     showTabs: this.showTabs,
                     showTabsInFullscreen: this.showTabsInFullscreen,
+                    showLeftPanel: this.showLeftPanel,
                     keymap: this.keymap,
                     keyBindings: this.keyBindings.map((kb) => toRaw(kb)),
                     emacsMetaKey: window.heynote.platform.isMac ? this.metaKey : "alt",
@@ -438,6 +444,19 @@
                                         :disabled="!showTabs"
                                     />
                                     Show tabs in fullscreen mode
+                                </label>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="entry">
+                                <h2>Sidebar</h2>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        v-model="showLeftPanel"
+                                        @change="updateSettings"
+                                    />
+                                    Show sidebar
                                 </label>
                             </div>
                         </div>

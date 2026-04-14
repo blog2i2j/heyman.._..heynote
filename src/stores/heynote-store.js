@@ -3,6 +3,7 @@ import { defineStore } from "pinia"
 import { NoteFormat } from "../common/note-format"
 import { toSafeBrowserLocale } from "../util/locale.js"
 import { useEditorCacheStore } from "./editor-cache"
+import { useSettingsStore } from "./settings-store"
 import { 
     SCRATCH_FILE_NAME, WINDOW_FULLSCREEN_STATE, WINDOW_FOCUS_STATE, 
     SAVE_TABS_STATE, LOAD_TABS_STATE, CONTEXT_MENU_CLOSED 
@@ -27,7 +28,8 @@ export const useHeynoteStore = defineStore("heynote", {
         libraryId: 0,
         createBufferParams: {
             mode: "new",
-            nameSuggestion: ""
+            nameSuggestion: "",
+            parentPath: "",
         },
 
         showBufferSelector: false,
@@ -40,6 +42,8 @@ export const useHeynoteStore = defineStore("heynote", {
         drawImageUrl: null,
         drawImageId: null,
 
+        showLeftPanel: window.heynote.settings.showLeftPanel ?? false,
+        leftPanelWidth: window.heynote.settings.leftPanelWidth ?? 220,
         isFullscreen: false,
         isFocused: true,
         systemLocale: navigator.language,
@@ -59,6 +63,19 @@ export const useHeynoteStore = defineStore("heynote", {
                 return
             }
             this.currentEditor.focus()
+        },
+
+        setLeftPanelVisible(visible, persist = true) {
+            this.showLeftPanel = visible
+            if (persist) {
+                useSettingsStore().updateSettings({
+                    showLeftPanel: this.showLeftPanel,
+                })
+            }
+        },
+
+        toggleLeftPanel() {
+            this.setLeftPanelVisible(!this.showLeftPanel, true)
         },
 
         openBuffer(path) {
@@ -193,12 +210,13 @@ export const useHeynoteStore = defineStore("heynote", {
             this.closeDialog()
             this.showMoveToBufferSelector = true
         },
-        openCreateBuffer(createMode, nameSuggestion) {
+        openCreateBuffer(createMode, nameSuggestion, parentPath) {
             createMode = createMode || "new"
             this.closeDialog()
             this.createBufferParams = {
                 mode: createMode || "new",
-                name: nameSuggestion || ""
+                name: nameSuggestion || "",
+                parentPath: parentPath || "",
             }
             this.showCreateBuffer = true
         },
@@ -296,12 +314,49 @@ export const useHeynoteStore = defineStore("heynote", {
             toRaw(this.currentEditor).setName(name)
             await (toRaw(this.currentEditor)).save()
             if (newPath && path !== newPath) {
-                //console.log("moving note", path, newPath)
+                await this.moveBuffer(path, newPath)
+                return
+            }
+            await this.updateBuffers()
+        },
+
+        async moveBuffer(path, newPath) {
+            if (!newPath || path === newPath) {
+                return
+            }
+            if (this.buffers[newPath]) {
+                throw new Error(`Note already exists: ${newPath}`)
+            }
+
+            const editorCacheStore = useEditorCacheStore()
+            const sourceEditor = toRaw(editorCacheStore.cache[path])
+
+            // Flush unsaved in-memory state before the underlying file move.
+            if (sourceEditor) {
+                await sourceEditor.save()
+            }
+
+            const wasCurrentBuffer = this.currentBufferPath === path
+            const replacePath = (entryPath) => entryPath === path ? newPath : entryPath
+
+            if (!wasCurrentBuffer) {
+                this.openTabs = this.openTabs.map(replacePath)
+                this.recentBufferPaths = this.recentBufferPaths.map(replacePath)
+                this.closedTabs = this.closedTabs.map((closedTab) => ({
+                    ...closedTab,
+                    path: replacePath(closedTab.path),
+                }))
+                editorCacheStore.freeEditor(path)
+            }
+
+            await window.heynote.buffer.move(path, newPath)
+
+            if (wasCurrentBuffer) {
                 this.closeTab(path)
-                await window.heynote.buffer.move(path, newPath)
                 this.openBuffer(newPath)
             }
-            this.updateBuffers()
+
+            await this.updateBuffers()
         },
 
         async deleteBuffer(path) {
@@ -329,6 +384,16 @@ export const useHeynoteStore = defineStore("heynote", {
             }
 
             await window.heynote.buffer.delete(path)
+            await this.updateBuffers()
+        },
+
+        async deleteDirectory(path) {
+            await window.heynote.buffer.deleteDirectory(path)
+            await this.updateBuffers()
+        },
+
+        async createDirectory(path) {
+            await window.heynote.buffer.createDirectory(path)
             await this.updateBuffers()
         },
 
@@ -397,6 +462,11 @@ export async function initHeynoteStore() {
 
     watch(() => heynoteStore.currentBufferPath, () => heynoteStore.saveTabsState())
     watch(() => heynoteStore.openTabs, () => heynoteStore.saveTabsState())
+
+    watch(() => heynoteStore.leftPanelWidth, () => {
+        //console.log("updating --left-panel-width")
+        document.documentElement.style.setProperty("--left-panel-width", heynoteStore.leftPanelWidth + "px");
+    }, {immediate:true})
 
     heynoteStore.systemLocale = toSafeBrowserLocale(await window.heynote.getSystemLocale())
 }

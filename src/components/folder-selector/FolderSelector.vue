@@ -4,6 +4,10 @@
 
     const pathSep = window.heynote.buffer.pathSeparator
 
+    function hasHiddenDirectorySegment(path) {
+        return path.split(pathSep).some((segment) => segment.startsWith("."))
+    }
+
     export default {
         props: {
             directoryTree: Object,
@@ -43,6 +47,9 @@
             listItems() {
                 const items = []
                 const getListItems = (node, level) => {
+                    if (node.path && hasHiddenDirectorySegment(node.path)) {
+                        return
+                    }
                     items.push({
                         name: node.name, 
                         level: level,

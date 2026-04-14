@@ -1,5 +1,5 @@
 <script>
-    import { mapState } from 'pinia'
+    import { mapState, mapStores } from 'pinia'
     import UpdateStatusItem from './UpdateStatusItem.vue'
     import { LANGUAGES } from '../editor/languages.js'
     import { formatDate, formatFullDate } from '../common/format-date'
@@ -31,6 +31,7 @@
         },
 
         computed: {
+            ...mapStores(useHeynoteStore),
             ...mapState(useHeynoteStore, [
                 "currentBufferName",
                 "currentCursorLine",
@@ -104,6 +105,13 @@
 
 <template>
     <div :class="className">
+        <div 
+            @click.stop="$emit('toggleLeftPanel')"
+            class="status-block sidebar clickable"
+            :title="getTooltip('Toggle Sidebar', 'toggleLeftPanel')"
+        >
+            <span class="icon icon-format"></span>
+        </div>
         <div class="status-block line-number">
             Ln <span class="num">{{ currentCursorLine?.line }}</span>
             Col <span class="num">{{ currentCursorLine?.col }}</span>
@@ -228,6 +236,15 @@
             color: rgba(255, 255, 255, 0.7)
             +dark-mode
                 color: rgba(255, 255, 255, 0.55)
+        
+        .sidebar
+            padding-top: 0
+            padding-bottom: 0
+            .icon
+                background-size: 15px
+                background-repeat: no-repeat
+                background-position: center center
+                background-image: url("@/assets/icons/sidebar.svg")
         
         .format
             padding-top: 0
