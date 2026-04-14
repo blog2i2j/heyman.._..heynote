@@ -2,7 +2,7 @@
 
 Here are the most notable changes in each release. For a more detailed list of changes, see the [Github Releases page](https://github.com/heyman/heynote/releases).
 
-## Not yet released
+## 2.9.0-beta
 
 ### Sidebar with tree view of the note buffers
 
