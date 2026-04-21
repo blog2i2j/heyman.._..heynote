@@ -74,20 +74,21 @@
                 return !!window.heynote.autoUpdate
             },
 
-        formattedCreatedTime() {
-            if (!this.currentCreatedTime) {
-                return null
-            }
-            return formatDate(this.currentCreatedTime, this.systemLocale)
-        },
 
-        createdTimeTitle() {
-            if (!this.currentCreatedTime) {
-                return null
-            }
-            return "Block created " +  formatFullDate(this.currentCreatedTime, this.systemLocale)
+            formattedCreatedTime() {
+                if (!this.currentCreatedTime) {
+                    return null
+                }
+                return formatDate(this.currentCreatedTime, this.systemLocale)
+            },
+
+            createdTimeTitle() {
+                if (!this.currentCreatedTime) {
+                    return null
+                }
+                return "Block created " +  formatFullDate(this.currentCreatedTime, this.systemLocale)
+            },
         },
-    },
 
         methods: {
             onSpellcheckingContextMenu(event) {
