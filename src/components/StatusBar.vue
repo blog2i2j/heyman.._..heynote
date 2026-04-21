@@ -130,7 +130,7 @@
         <div 
             @click.stop="$emit('openBufferSelector')"
             class="status-block note clickable"
-            :title="getTooltip('Change Note', 'openBufferSelector')"
+            :title="getTooltip('Change Buffer', 'openBufferSelector')"
         >
             {{ currentBufferName }} 
         </div>
