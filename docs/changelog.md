@@ -15,6 +15,7 @@ You can now turn on a sidebar with a tree view of all your buffers and directori
 
 ### Other changes
 
+- Add an archive action for the default Scratch buffer, which moves its current content into an archive buffer and starts a fresh Scratch buffer
 - Persist the search query between different buffers, and between restarts
 
 

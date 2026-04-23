@@ -88,6 +88,10 @@
                 this.focusEditor()
             })
 
+            window.heynote.mainProcess.on('tab:archiveScratch', () => {
+                this.heynoteStore.openArchiveScratchDialog()
+            })
+
             window.heynote.mainProcess.on('bufferTree:deleteDirectory', async (event, directoryPath) => {
                 try {
                     await this.deleteDirectory(directoryPath)

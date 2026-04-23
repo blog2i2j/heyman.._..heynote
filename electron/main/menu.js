@@ -256,7 +256,14 @@ export function getTabContextMenu(win, tabPath) {
     
     const menuItems = []
     
-    if (!isScratchFile) {
+    if (isScratchFile) {
+        menuItems.push({
+            label: 'Archive...',
+            click: () => {
+                win?.webContents.send('tab:archiveScratch')
+            },
+        })
+    } else {
         menuItems.push(
             {
                 label: 'Edit Buffer…',
@@ -301,22 +308,33 @@ export function getTabContextMenu(win, tabPath) {
 export function getBufferTreeContextMenu(win, bufferPath) {
     const isScratchFile = bufferPath === SCRATCH_FILE_NAME
     const parentDirectory = getParentDirectory(bufferPath)
+    const menuItems = []
 
-    return Menu.buildFromTemplate([
-        {
-            label: 'Edit Buffer…',
-            enabled: !isScratchFile,
+    if (isScratchFile) {
+        menuItems.push({
+            label: 'Archive...',
             click: () => {
-                win?.webContents.send('tab:editBuffer', bufferPath)
+                win?.webContents.send('tab:archiveScratch')
             },
-        },
-        {
-            label: 'Delete Buffer',
-            enabled: !isScratchFile,
-            click: () => {
-                win?.webContents.send('tab:deleteBuffer', bufferPath)
+        })
+    } else {
+        menuItems.push(
+            {
+                label: 'Edit Buffer…',
+                click: () => {
+                    win?.webContents.send('tab:editBuffer', bufferPath)
+                },
             },
-        },
+            {
+                label: 'Delete Buffer',
+                click: () => {
+                    win?.webContents.send('tab:deleteBuffer', bufferPath)
+                },
+            }
+        )
+    }
+
+    menuItems.push(
         { type: 'separator' },
         {
             label: 'New Buffer…',
@@ -329,8 +347,10 @@ export function getBufferTreeContextMenu(win, bufferPath) {
             click: () => {
                 win?.webContents.send('bufferTree:createFolder', parentDirectory)
             },
-        },
-    ])
+        }
+    )
+
+    return Menu.buildFromTemplate(menuItems)
 }
 
 export function getBufferTreeDirectoryContextMenu(win, directoryPath, isEmptyDirectory) {

@@ -5,18 +5,30 @@
         props: {
             parentPath: String,
             level: Number,
+            initialName: {
+                type: String,
+                default: "",
+            },
+            autoFocus: {
+                type: Boolean,
+                default: true,
+            },
         },
 
         data() {
             return {
-                name: "",
+                name: this.initialName,
                 eventTriggered: false,
                 nameError: false,
             }
         },
 
         mounted() {
-            this.$refs.input.focus()
+            this.emitSuggestedPath()
+            if (this.autoFocus) {
+                this.$refs.input.focus()
+                this.$refs.input.select()
+            }
         },
 
         computed: {
@@ -35,6 +47,14 @@
         },
 
         methods: {
+            emitSuggestedPath() {
+                const sanitizedName = sanitizeFilename(this.name, "_")
+                const suggestedPath = sanitizedName && !sanitizedName.startsWith(".")
+                    ? (this.parentPath ? this.parentPath + window.heynote.buffer.pathSeparator + sanitizedName : sanitizedName)
+                    : this.parentPath
+                this.$emit("update-suggested-path", suggestedPath)
+            },
+
             onKeyDown(event) {
                 if (event.key === "Enter") {
                     event.preventDefault()
@@ -66,6 +86,11 @@
                     this.$emit("create-folder", this.parentPath, sanitizedName)
                 }
             },
+
+            onInput() {
+                this.nameError = false
+                this.emitSuggestedPath()
+            },
         },
     }
 </script>
@@ -83,7 +108,7 @@
             placeholder="New folder name"
             maxlength="60"
             @keydown.stop="onKeyDown"
-            @input="nameError = false"
+            @input="onInput"
             @blur="finish"
         />
     </div>

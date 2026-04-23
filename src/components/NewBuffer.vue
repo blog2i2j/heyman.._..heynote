@@ -7,6 +7,17 @@
 
     const pathSep = window.heynote.buffer.pathSeparator
 
+    function hasHiddenDirectorySegment(path) {
+        return path.split(pathSep).some((segment) => segment.startsWith("."))
+    }
+
+    function getArchiveDirectoryPath(directories) {
+        // Only auto-select a dedicated archive folder at the library root.
+        return [...directories]
+            .filter((path) => !hasHiddenDirectorySegment(path))
+            .find((path) => !path.includes(pathSep) && path.toLowerCase() === "archive")
+    }
+
     export default {
         data() {
             return {
@@ -35,16 +46,37 @@
                 this.$refs.nameInput.focus()
             }
 
-            this.parentPath = this.targetDirectory
-            this.updateBuffers()
+            const directories = await window.heynote.buffer.getDirectoryList()
+            let selectedDirectory = this.targetDirectory
+            if (this.createBufferParams.mode === "archiveScratch") {
+                // check if a root-level archive folder already exists.
+                const archiveDirectoryPath = getArchiveDirectoryPath(directories)
+                if (archiveDirectoryPath) {
+                    selectedDirectory = archiveDirectoryPath
+                } else {
+                    // otherwise we preselect the path where the synthetic pending folder row will appear.
+                    selectedDirectory = "archive"
+                }
+            }
+            this.parentPath = selectedDirectory
+            await this.updateBuffers()
 
             // build directory tree
-            const directories = await window.heynote.buffer.getDirectoryList()
             const rootNode = {
                 name: "Heynote Root",
                 path: "",
                 children: [],
                 open: true,
+            }
+            if (this.createBufferParams.mode === "archiveScratch" && !getArchiveDirectoryPath(directories)) {
+                // show a pending "archive" folder entry so the dialog starts with a concrete target selected
+                rootNode.children.push({
+                    name: "archive",
+                    children: [],
+                    path: "archive",
+                    newFolder: true,
+                    open: false,
+                })
             }
             const getNodeFromList = (list, part) => list.find(node => node.name === part)
                 
@@ -63,7 +95,7 @@
                             name: part,
                             children: [],
                             path: currentPath,
-                            open: this.targetDirectory.startsWith(currentPath),
+                            open: selectedDirectory.startsWith(currentPath),
                         }
                         currentLevel.children.push(node)
                         currentLevel = node
@@ -101,7 +133,21 @@
             },
 
             dialogTitle() {
-                return this.createBufferParams.mode === "currentBlock" ? "Move Block to New Buffer" : "New Buffer"
+                if (this.createBufferParams.mode === "currentBlock") {
+                    return "Move Block to New Buffer"
+                }
+                if (this.createBufferParams.mode === "archiveScratch") {
+                    return "Archive Buffer"
+                }
+                return "New Buffer"
+            },
+
+            folderLabel() {
+                return this.createBufferParams.mode === "archiveScratch" ? "Archive in" : "Create in"
+            },
+
+            submitButtonText() {
+                return this.createBufferParams.mode === "archiveScratch" ? "Archive Buffer" : "Create New Buffer"
             },
         },
 
@@ -110,6 +156,7 @@
                 "updateBuffers",
                 "createNewBuffer",
                 "createNewBufferFromActiveBlock",
+                "archiveScratchBuffer",
             ]),
 
             onKeydown(event) {
@@ -150,11 +197,11 @@
                 }
             },
 
-            submit() {
+            findAvailableBufferPath() {
                 let slug = filenameSlug(this.name)
                 if (slug === "") {
                     this.errors.name = true
-                    return
+                    return null
                 }
                 const parentPathPrefix = this.parentPath === "" ? "" : this.parentPath + pathSep
                 let path;
@@ -169,15 +216,30 @@
                 if (this.buffers[path]) {
                     console.error("Failed to create buffer, path already exists", path)
                     this.errors.name = true
+                    return null
+                }
+                return path
+            },
+
+            async submit() {
+                const path = this.findAvailableBufferPath()
+                if (!path) {
                     return
                 }
                 //console.log("Creating buffer", path, this.createBufferParams)
-                if (this.createBufferParams.mode === "currentBlock") {
-                    this.createNewBufferFromActiveBlock(path, this.name)
-                } else if (this.createBufferParams.mode === "new") {
-                    this.createNewBuffer(path, this.name)
-                } else {
-                    throw new Error("Unknown createBuffer Mode: " + this.createBufferParams.mode)
+                try {
+                    if (this.createBufferParams.mode === "currentBlock") {
+                        await this.createNewBufferFromActiveBlock(path, this.name)
+                    } else if (this.createBufferParams.mode === "new") {
+                        await this.createNewBuffer(path, this.name)
+                    } else if (this.createBufferParams.mode === "archiveScratch") {
+                        await this.archiveScratchBuffer(path, this.name)
+                    } else {
+                        throw new Error("Unknown createBuffer Mode: " + this.createBufferParams.mode)
+                    }
+                } catch (error) {
+                    console.error("Failed to submit buffer dialog:", error)
+                    return
                 }
 
                 this.$emit("close")
@@ -204,7 +266,7 @@
                     data-1p-ignore
                 />
 
-                <label for="folder-select">Create in</label>
+                <label for="folder-select">{{ folderLabel }}</label>
                 <FolderSelector 
                     v-if="directoryTree"
                     :directoryTree="directoryTree"
@@ -215,7 +277,7 @@
                 />
             </div>
             <div class="bottom-bar">
-                <button type="submit">Create New Buffer</button>
+                <button type="submit">{{ submitButtonText }}</button>
                 <button 
                     class="cancel"
                     @keydown="onCancelKeydown"

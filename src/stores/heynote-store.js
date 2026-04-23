@@ -2,6 +2,7 @@ import { toRaw, nextTick, watch } from 'vue';
 import { defineStore } from "pinia"
 import { NoteFormat } from "../common/note-format"
 import { toSafeBrowserLocale } from "../util/locale.js"
+import { getInitialContent, getPlatformIdFromHeynotePlatform } from "../common/initial-content.js"
 import { useEditorCacheStore } from "./editor-cache"
 import { useSettingsStore } from "./settings-store"
 import { 
@@ -220,6 +221,12 @@ export const useHeynoteStore = defineStore("heynote", {
             }
             this.showCreateBuffer = true
         },
+        openArchiveScratchDialog() {
+            // get date formatted as YYYY-MM-DD
+            const now = new Date()
+            const archiveDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+            this.openCreateBuffer("archiveScratch", `Archived Scratch (${archiveDate})`, "")
+        },
         openDrawImageModal(imageUrl, imageId) {
             this.closeDialog()
             this.drawImageUrl = imageUrl
@@ -283,6 +290,51 @@ export const useHeynoteStore = defineStore("heynote", {
          */
         async createNewBuffer(path, name) {
             await toRaw(this.currentEditor).createNewBuffer(path, name)
+        },
+
+        async archiveScratchBuffer(path, name) {
+            if (!path || path === SCRATCH_FILE_NAME) {
+                throw new Error(`Invalid archive path: ${path}`)
+            }
+            if (this.buffers[path]) {
+                throw new Error(`Note already exists: ${path}`)
+            }
+
+            const archiveDirectory = path.split(window.heynote.buffer.pathSeparator).slice(0, -1).join(window.heynote.buffer.pathSeparator)
+            if (archiveDirectory) {
+                await window.heynote.buffer.createDirectory(archiveDirectory)
+            }
+
+            const editorCacheStore = useEditorCacheStore()
+            const scratchEditor = toRaw(editorCacheStore.cache[SCRATCH_FILE_NAME])
+
+            let archivedNote
+            if (scratchEditor) {
+                await scratchEditor.contentLoadedPromise
+                await scratchEditor.save()
+                archivedNote = NoteFormat.load(scratchEditor.getContent())
+            } else {
+                archivedNote = NoteFormat.load(await window.heynote.buffer.load(SCRATCH_FILE_NAME))
+            }
+            archivedNote.metadata.name = name
+            await window.heynote.buffer.create(path, archivedNote.serialize())
+
+            const initialScratchContent = getInitialContent(
+                getPlatformIdFromHeynotePlatform(window.heynote.platform),
+                window.heynote.isDev,
+            )
+
+            await window.heynote.buffer.save(SCRATCH_FILE_NAME, initialScratchContent)
+
+            if (scratchEditor) {
+                editorCacheStore.freeEditor(SCRATCH_FILE_NAME, false)
+                if (this.currentBufferPath === SCRATCH_FILE_NAME) {
+                    this.currentEditor = null
+                    this.libraryId++
+                }
+            }
+
+            await this.updateBuffers()
         },
 
         /**
