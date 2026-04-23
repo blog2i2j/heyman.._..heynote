@@ -13,9 +13,17 @@ You can now turn on a sidebar with a tree view of all your buffers and directori
   <img src="https://heynote.com/img/light/buffer-tree.png" width="400" alt="New sidebar buffer tree feature">
 </picture>
 
+
+### Archive Scratch functionality
+
+A new archive action has been added for the default Scratch buffer. It can be accessed from the Scratch buffer's 
+context (right click) menu. It moves the content of Scratch into a new buffer buffer and starts a fresh Scratch buffer.
+
+For performance reasons it's recommended to use this feature if the Scratch buffer grows large (e.g. multiple MBs).
+
+
 ### Other changes
 
-- Add an archive action for the default Scratch buffer, which moves its current content into an archive buffer and starts a fresh Scratch buffer
 - Persist the search query between different buffers, and between restarts
 
 
