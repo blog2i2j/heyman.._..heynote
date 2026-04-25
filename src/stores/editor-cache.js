@@ -86,12 +86,12 @@ export const useEditorCacheStore = defineStore("editorCache", {
             }
         },
 
-        freeEditor(pathToFree) {
+        freeEditor(pathToFree, save = true) {
             //console.log("Freeing:", pathToFree)
             if (!this.cache[pathToFree]) {
                 return
             }
-            this.cache[pathToFree].destroy()
+            this.cache[pathToFree].destroy(save)
             delete this.cache[pathToFree]
             this.lru = this.lru.filter(p => p !== pathToFree)
             delete this.accessTimes[pathToFree]
